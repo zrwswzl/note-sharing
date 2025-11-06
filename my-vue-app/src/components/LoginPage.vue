@@ -3,7 +3,6 @@
     <div class="card">
       <h2 class="title">欢迎登录</h2>
       
-      <!-- 用户/管理员切换 -->
       <div class="toggle-container">
         <button
           @click="loginType = 'user'"
@@ -29,6 +28,7 @@
               v-model="form.email"
               placeholder="请输入注册邮箱"
               required
+              :disabled="isLoading"
             />
           </div>
         </div>
@@ -42,28 +42,30 @@
               v-model="form.password"
               placeholder="请输入密码"
               required
+              :disabled="isLoading"
             />
             <button
               type="button"
               @click="showPassword = !showPassword"
               class="eye-btn"
+              tabindex="-1"
             >
               {{ showPassword ? '👁️' : '👁️‍🗨️' }}
             </button>
           </div>
         </div>
 
-        <!-- 消息提示 -->
         <div v-if="message.text" :class="['message', message.type]">
           {{ message.text }}
         </div>
 
-        <button type="submit" class="submit-btn">登录</button>
+        <button type="submit" class="submit-btn" :disabled="isLoading">
+          {{ isLoading ? '登录中...' : '登录' }}
+        </button>
 
-        <!-- 仅用户登录显示 -->
         <div v-if="loginType === 'user'" class="links">
-          <a @click="$emit('change-page', 'forgot-password')" class="link">忘记密码？</a>
-          <a @click="$emit('change-page', 'register')" class="link">用户注册</a>
+          <router-link to="/forgot-password" class="link">忘记密码？</router-link>
+          <router-link to="/register" class="link">用户注册</router-link>
         </div>
       </form>
     </div>
@@ -73,19 +75,14 @@
 <script>
 export default {
   name: 'LoginPage',
-  emits: ['change-page'],
+  // 不再需要 emits，因为我们直接使用 router 跳转
   data() {
     return {
       loginType: 'user',
       showPassword: false,
-      form: {
-        email: '',
-        password: ''
-      },
-      message: {
-        type: '',
-        text: ''
-      }
+      isLoading: false,
+      form: { email: '', password: '' },
+      message: { type: '', text: '' }
     }
   },
   methods: {
@@ -95,26 +92,30 @@ export default {
         return
       }
 
-      // 这里可以调用实际的登录 API
-      this.message = { 
-        type: 'success', 
-        text: `${this.loginType === 'user' ? '用户' : '管理员'}登录成功！` 
-      }
-      
-      console.log(`${this.loginType}登录:`, this.form)
-      
-      // 清空消息
+      this.isLoading = true;
+      this.message = { type: '', text: '' };
+
       setTimeout(() => {
-        this.message = { type: '', text: '' }
-      }, 3000)
+        this.message = { type: 'success', text: '登录成功，正在跳转...' }
+        
+        setTimeout(() => {
+          this.isLoading = false;
+          // 核心修改：使用路由跳转
+          if (this.loginType === 'user') {
+            this.$router.push('/user');
+          } else {
+            this.$router.push('/admin');
+          }
+        }, 800);
+      }, 1000);
     }
   }
 }
 </script>
-
 <style scoped>
 .login-page {
   width: 100%;
+  max-width: 450px; 
 }
 
 .card {

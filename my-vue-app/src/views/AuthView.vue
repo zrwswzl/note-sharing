@@ -36,8 +36,15 @@ export default {
 
 <style scoped>
 .auth-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   width: 100%;
-  max-width: 450px;
+  /* max-width: 450px;
+  margin: 0 auto; */
 }
 
 .fade-enter-active, .fade-leave-active {
@@ -53,4 +60,6 @@ export default {
   opacity: 0;
   transform: translateY(-10px);
 }
+
+
 </style>
