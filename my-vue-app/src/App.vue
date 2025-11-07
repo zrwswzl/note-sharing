@@ -19,15 +19,16 @@ export default {
 
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  /* background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); */
+  background-color: #f0f2f5;
   min-height: 100vh;
 }
 
 #app {
   min-height: 100vh;
-  display: flex;
+  /* display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 20px; */
 }
 </style>
