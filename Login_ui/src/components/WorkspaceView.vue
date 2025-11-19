@@ -1,56 +1,100 @@
 <template>
-  <div class="workspace-container">
-    <!-- 顶部搜索栏 -->
-    <div class="search-bar-container">
-      <input v-model="searchQuery" class="search-input" placeholder="搜索笔记标题、空间或笔记本..." @keyup.enter="handleSearch" />
-      <button class="primary search-btn" @click="handleSearch">搜索</button>
-    </div>
-    <div class="workspace-layout-3col">
-      <!-- 侧边栏树结构 START -->
-      <div class="sidebar-tree">
-        <!-- 空间 -->
+  <div class="workspace-page">
+    <section class="workspace-hero">
+      <div class="hero-text">
+        <p class="section-label">知识空间</p>
+        <h1>工作台</h1>
+        <p class="hero-subtext">浏览空间树、查看笔记详情并快速管理内容，所有操作保持当前逻辑。</p>
+      </div>
+      <div class="hero-search">
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="搜索笔记标题、空间或笔记本..."
+          @keyup.enter="handleSearch"
+        />
+        <button class="text-action primary" type="button" @click="handleSearch">
+          <span>搜索</span>
+          <span aria-hidden="true">↗</span>
+        </button>
+      </div>
+    </section>
+
+    <div class="workspace-grid">
+      <aside class="sidebar-tree">
+        <div class="sidebar-head">
+          <div>
+            <p class="label">结构树</p>
+            <h3>空间与笔记本</h3>
+          </div>
+          <button class="ghost-btn" type="button" @click="showCreateSpaceDialog = true">+ 新建空间</button>
+        </div>
+
         <ul class="tree-root">
           <li v-for="space in spacesWithExpand" :key="space.id" class="tree-node">
             <div :class="['node-label', { active: selectedSpace?.id === space.id }]" @click="onToggleExpand('space', space)">
-              <span @click.stop="selectSpace(space)">
-                <span class="expand-trigger" v-if="space.expandable" @click.stop="toggleExpand('space', space)">
-                  <span v-if="space.expanded">▼</span>
-                  <span v-else>▶</span>
-                </span>
-                📁 {{ space.name }}
-              </span>
-              <span class="item-actions">
-                <button @click.stop="editSpace(space)">✏️</button>
-                <button @click.stop="deleteSpace(space.id)">🗑️</button>
-                <button @click.stop="showCreateNotebookForSpace(space)">➕</button>
-              </span>
+              <div class="node-main">
+                <button
+                  class="expand-trigger"
+                  type="button"
+                  v-if="space.expandable"
+                  @click.stop="toggleExpand('space', space)"
+                >
+                  <span :class="['chevron', { open: space.expanded }]"></span>
+                </button>
+                <button class="node-focus" type="button" @click.stop="selectSpace(space)">
+                  <span class="icon icon-folder" aria-hidden="true"></span>
+                  <span>{{ space.name }}</span>
+                </button>
+              </div>
+              <div class="item-actions">
+                <button class="ghost-btn" type="button" @click.stop="editSpace(space)">重命名</button>
+                <button class="ghost-btn" type="button" @click.stop="deleteSpace(space.id)">删除</button>
+                <button class="ghost-btn" type="button" @click.stop="showCreateNotebookForSpace(space)">新建笔记本</button>
+              </div>
             </div>
+
             <ul v-show="space.expanded" v-if="space.notebooks && space.notebooks.length" class="tree-children">
               <li v-for="notebook in space.notebooks" :key="notebook.id" class="tree-node">
                 <div :class="['node-label', { active: selectedNotebook?.id === notebook.id }]" @click="onToggleExpand('notebook', notebook, space)">
-                  <span @click.stop="selectNotebook(notebook, space)">
-                    <span class="expand-trigger" v-if="notebook.expandable" @click.stop="toggleExpand('notebook', notebook, space)">
-                      <span v-if="notebook.expanded">▼</span>
-                      <span v-else>▶</span>
-                    </span>
-                    📒 {{ notebook.name }}
-                  </span>
-                  <span class="item-actions">
-                    <button @click.stop="moveNotebook(notebook)">📤</button>
-                    <button @click.stop="editNotebook(notebook)">✏️</button>
-                    <button @click.stop="deleteNotebook(notebook.id)">🗑️</button>
-                    <button @click.stop="showCreateNoteForNotebook(notebook, space)">➕</button>
-                  </span>
+                  <div class="node-main">
+                    <button
+                      class="expand-trigger"
+                      type="button"
+                      v-if="notebook.expandable"
+                      @click.stop="toggleExpand('notebook', notebook, space)"
+                    >
+                      <span :class="['chevron', { open: notebook.expanded }]"></span>
+                    </button>
+                    <button class="node-focus" type="button" @click.stop="selectNotebook(notebook, space)">
+                      <span class="icon icon-notebook" aria-hidden="true"></span>
+                      <span>{{ notebook.name }}</span>
+                    </button>
+                  </div>
+                  <div class="item-actions">
+                    <button class="ghost-btn" type="button" @click.stop="moveNotebook(notebook)">移动</button>
+                    <button class="ghost-btn" type="button" @click.stop="editNotebook(notebook)">重命名</button>
+                    <button class="ghost-btn" type="button" @click.stop="deleteNotebook(notebook.id)">删除</button>
+                    <button class="ghost-btn" type="button" @click.stop="showCreateNoteForNotebook(notebook, space)">新建笔记</button>
+                  </div>
                 </div>
+
                 <ul v-show="notebook.expanded" v-if="notebook.notes && notebook.notes.length" class="tree-children">
-                  <li v-for="note in notebook.notes" :key="note.id" :class="['tree-node', {'active-note': selectedNote?.id === note.id}]">
-                    <div class="node-label" @click="selectNote(note, notebook, space)">
-                      📄 {{ note.title }}
-                      <span class="item-actions">
-                        <button @click.stop="moveNote(note)">📤</button>
-                        <button @click.stop="editNote(note)">✏️</button>
-                        <button @click.stop="deleteNote(note.id)">🗑️</button>
-                      </span>
+                  <li
+                    v-for="note in notebook.notes"
+                    :key="note.id"
+                    :class="['tree-node', { 'active-note': selectedNote?.id === note.id }]"
+                  >
+                    <div class="node-label note-node" @click="selectNote(note, notebook, space)">
+                      <div class="node-main">
+                        <span class="icon icon-note" aria-hidden="true"></span>
+                        <span>{{ note.title }}</span>
+                      </div>
+                      <div class="item-actions">
+                        <button class="ghost-btn" type="button" @click.stop="moveNote(note)">移动</button>
+                        <button class="ghost-btn" type="button" @click.stop="editNote(note)">编辑</button>
+                        <button class="ghost-btn" type="button" @click.stop="deleteNote(note.id)">删除</button>
+                      </div>
                     </div>
                   </li>
                   <li v-if="notebook.notes.length === 0">
@@ -74,59 +118,66 @@
             </ul>
           </li>
         </ul>
-        <button class="sidebar-add-btn" @click="showCreateSpaceDialog = true">+ 新建空间</button>
-      </div>
-      <!-- 侧边栏树结构 END -->
+      </aside>
 
-      <!-- 中间栏：占位，可扩展用于标签、预览等 -->
-      <div class="middle-panel"></div>
+      <section class="middle-panel">
+        <div class="info-card">
+          <p class="label">当前空间</p>
+          <h3>{{ selectedSpace?.name || '未选择空间' }}</h3>
+          <p class="muted">选择左侧空间以加载对应笔记本。</p>
+        </div>
+        <div class="info-card">
+          <p class="label">当前笔记本</p>
+          <h3>{{ selectedNotebook?.name || '未选择笔记本' }}</h3>
+          <p class="muted">在笔记本下可创建在线笔记或上传文件。</p>
+        </div>
+      </section>
 
-      <!-- 右侧：笔记详情展示 -->
-      <div class="right-panel" v-if="selectedNoteContent">
+      <section class="right-panel" v-if="selectedNoteContent">
         <div class="note-detail-header">
+          <p class="label">笔记详情</p>
           <h3>{{ selectedNote?.title || '笔记详情' }}</h3>
         </div>
         <div class="note-detail-content" v-if="selectedNoteContent.type === 'editor'">
           <div v-html="selectedNoteContent.content"></div>
         </div>
         <div class="note-detail-content" v-else-if="selectedNoteContent.type === 'upload'">
-          <div>
-            <a :href="selectedNoteContent.fileUrl" target="_blank">下载附件/预览</a>
-          </div>
+          <a :href="selectedNoteContent.fileUrl" target="_blank" class="text-link">下载附件 / 预览</a>
         </div>
         <div class="note-detail-content" v-else>
           <em>无法展示此类型的内容</em>
         </div>
-      </div>
+      </section>
+      <section class="right-panel empty" v-else>
+        <p>选择需要查看的笔记</p>
+        <small>点击左侧树状结构中的笔记即可在此处预览内容。</small>
+      </section>
     </div>
 
-    <!-- 创建空间对话框 -->
     <div v-if="showCreateSpaceDialog" class="modal" @click.self="showCreateSpaceDialog = false">
-      <div class="modal-content">
+      <div class="modal-card">
         <h3>{{ editingSpace ? '重命名空间' : '创建新空间' }}</h3>
         <input v-model="newSpaceName" type="text" placeholder="请输入空间名称" />
         <div class="modal-actions">
-          <button @click="showCreateSpaceDialog = false">取消</button>
-          <button class="primary" @click="handleCreateOrUpdateSpace">确定</button>
+          <button type="button" class="ghost-btn" @click="showCreateSpaceDialog = false">取消</button>
+          <button type="button" class="text-action primary" @click="handleCreateOrUpdateSpace">确定</button>
         </div>
       </div>
     </div>
 
-    <!-- 创建笔记本对话框 -->
     <div v-if="showCreateNotebookDialog" class="modal" @click.self="showCreateNotebookDialog = false">
-      <div class="modal-content">
+      <div class="modal-card">
         <h3>{{ editingNotebook ? '重命名笔记本' : '创建新笔记本' }}</h3>
         <input v-model="newNotebookName" type="text" placeholder="请输入笔记本名称" />
         <div class="modal-actions">
-          <button @click="showCreateNotebookDialog = false">取消</button>
-          <button class="primary" @click="handleCreateOrUpdateNotebook">确定</button>
+          <button type="button" class="ghost-btn" @click="showCreateNotebookDialog = false">取消</button>
+          <button type="button" class="text-action primary" @click="handleCreateOrUpdateNotebook">确定</button>
         </div>
       </div>
     </div>
 
-    <!-- 移动笔记本对话框 -->
     <div v-if="showMoveNotebookDialog" class="modal" @click.self="showMoveNotebookDialog = false">
-      <div class="modal-content">
+      <div class="modal-card">
         <h3>移动笔记本到其他空间</h3>
         <select v-model="targetSpaceId">
           <option value="">请选择目标空间</option>
@@ -135,15 +186,14 @@
           </option>
         </select>
         <div class="modal-actions">
-          <button @click="showMoveNotebookDialog = false">取消</button>
-          <button class="primary" @click="handleMoveNotebook">确定</button>
+          <button type="button" class="ghost-btn" @click="showMoveNotebookDialog = false">取消</button>
+          <button type="button" class="text-action primary" @click="handleMoveNotebook">确定</button>
         </div>
       </div>
     </div>
 
-    <!-- 移动笔记对话框 -->
     <div v-if="showMoveNoteDialog" class="modal" @click.self="showMoveNoteDialog = false">
-      <div class="modal-content">
+      <div class="modal-card">
         <h3>移动笔记到其他笔记本</h3>
         <select v-model="targetNotebookId">
           <option value="">请选择目标笔记本</option>
@@ -152,15 +202,14 @@
           </option>
         </select>
         <div class="modal-actions">
-          <button @click="showMoveNoteDialog = false">取消</button>
-          <button class="primary" @click="handleMoveNote">确定</button>
+          <button type="button" class="ghost-btn" @click="showMoveNoteDialog = false">取消</button>
+          <button type="button" class="text-action primary" @click="handleMoveNote">确定</button>
         </div>
       </div>
     </div>
 
-    <!-- 创建/编辑笔记对话框 -->
     <div v-if="showCreateNoteDialog" class="modal large" @click.self="showCreateNoteDialog = false">
-      <div class="modal-content">
+      <div class="modal-card">
         <h3>{{ editingNote ? '编辑笔记' : '创建新笔记' }}</h3>
         <input v-model="newNoteTitle" type="text" placeholder="请输入笔记标题" class="note-title-input" />
 
@@ -173,16 +222,13 @@
           </label>
         </div>
 
-            {formData.noteType === 'editor' && (
-              <div className="editor-container">
-                <textarea 
-                  placeholder="请输入笔记内容"
-                  rows="10"
-                  value={formData.content}
-                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                />
-              </div>
-            )}
+        <div v-if="noteType === 'editor'" class="editor-container">
+          <textarea
+            v-model="noteContent"
+            placeholder="请输入笔记内容"
+            rows="10"
+          ></textarea>
+        </div>
 
         <div v-if="noteType === 'upload'" class="upload-container">
           <input type="file" @change="handleFileUpload" accept=".txt,.md,.pdf,.doc,.docx" />
@@ -190,8 +236,8 @@
         </div>
 
         <div class="modal-actions">
-          <button @click="showCreateNoteDialog = false">取消</button>
-          <button class="primary" @click="handleCreateOrUpdateNote">确定</button>
+          <button type="button" class="ghost-btn" @click="showCreateNoteDialog = false">取消</button>
+          <button type="button" class="text-action primary" @click="handleCreateOrUpdateNote">确定</button>
         </div>
       </div>
     </div>
@@ -581,235 +627,496 @@ refreshTree()
 </script>
 
 <style scoped>
-.workspace-container {
-  height: 100%;
+:global(:root) {
+  --brand-primary: #22ee99;
+  --surface-base: #ffffff;
+  --surface-muted: #f7faf8;
+  --line-soft: #e6ece8;
+  --text-strong: #111c17;
+  --text-secondary: #4b5a53;
+  --text-muted: #90a19b;
 }
-.search-bar-container {
-  background: #f5f5f5;
-  padding: 12px 25px;
+
+.workspace-page {
+  min-height: 100vh;
+  padding: 48px 32px 96px;
+  background: var(--surface-muted);
   display: flex;
-  gap: 16px;
+  flex-direction: column;
+  gap: 32px;
 }
-.search-input {
+
+.workspace-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  background: var(--surface-base);
+  border: 1px solid var(--line-soft);
+  border-radius: 32px;
+  padding: 32px 40px;
+  box-shadow: 0 25px 80px rgba(17, 28, 23, 0.08);
+}
+
+.hero-text h1 {
+  margin: 8px 0 6px;
+  font-size: 40px;
+  color: var(--text-strong);
+}
+
+.section-label {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.hero-subtext {
+  margin: 0;
+  color: var(--text-secondary);
+  max-width: 520px;
+}
+
+.hero-search {
+  flex-shrink: 0;
+  width: min(420px, 100%);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 10px 12px 10px 20px;
+  background: var(--surface-muted);
+}
+
+.hero-search input {
   flex: 1;
+  border: none;
+  background: transparent;
   font-size: 16px;
-  padding: 7px 12px;
-  border: 1px solid #e0e0e0;
-  border-radius: 5px;
-  transition: border .2s;
+  color: var(--text-strong);
 }
-.search-input:focus{border-color:#00bcd4;}
 
-.search-btn {
-  padding: 8px 16px;
+.hero-search input:focus {
+  outline: none;
+}
+
+.text-action {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 999px;
+  padding: 10px 18px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
   font-size: 15px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
 }
 
-.workspace-layout-3col {
+.text-action.primary {
+  background: var(--surface-base);
+  border-color: var(--line-soft);
+}
+
+.text-action:hover,
+.text-action:focus-visible {
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+
+.workspace-grid {
   display: grid;
-  grid-template-columns: 320px 1fr 2fr;
-  gap: 20px;
-  height: calc(100% - 48px);
-  min-height: 550px;
+  grid-template-columns: 320px minmax(0, 300px) 1fr;
+  gap: 24px;
+}
+
+.sidebar-tree,
+.middle-panel,
+.right-panel {
+  background: var(--surface-base);
+  border: 1px solid var(--line-soft);
+  border-radius: 32px;
+  padding: 28px;
+  box-shadow: 0 18px 60px rgba(17, 28, 23, 0.05);
 }
 
 .sidebar-tree {
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  height: 100%;
-  padding: 16px 0 16px 0;
   display: flex;
   flex-direction: column;
+  max-height: 75vh;
+}
+
+.sidebar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.sidebar-head h3 {
+  margin: 4px 0 0;
+  font-size: 20px;
+  color: var(--text-strong);
+}
+
+.label {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.ghost-btn {
+  appearance: none;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.ghost-btn:hover,
+.ghost-btn:focus-visible {
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+
+.tree-root {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
   overflow-y: auto;
 }
-.tree-root {
-  padding-left: 0;
-  margin: 0;
-  list-style: none;
-}
+
 .tree-node {
-  margin: 0;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   font-size: 15px;
 }
+
 .tree-children {
   list-style: none;
   padding-left: 26px;
-  margin: 5px 0 8px 0;
-}
-.node-label {
-  display: flex;
-  align-items: center;
-  padding: 7px 12px;
-  border-radius: 5px;
-  justify-content: space-between;
-  background: none;
-  cursor: pointer;
-  transition: background .2s;
-}
-.node-label.active, .tree-node.active-note > .node-label {
-  background: #e0f7fa;
-}
-.node-label:hover {
-  background: #f5fbfe;
-}
-.expand-trigger {
-  display: inline-block;
-  width: 18px;
-  text-align: center;
-  margin-right: 3px;
-  user-select: none;
-  color: #888;
-}
-.item-actions {
-  display: flex;
-  gap: 4px;
-}
-.item-actions button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 15px;
-  padding: 2px 4px;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-  margin-left: 2px;
-}
-.item-actions button:hover {
-  opacity: 1;
-}
-.sidebar-add-btn {
-  margin: 12px auto 0 auto;
-  display: block;
-  background: #00bcd4;
-  color: white;
-  border: none;
-  padding: 7px 18px;
-  border-radius: 24px;
-  font-size: 16px;
-  cursor: pointer;
-  margin-top: auto;
-  margin-bottom: 0;
-}
-.sidebar-add-btn:hover {
-  background: #0097a7;
-}
-.tree-empty{
-  color: #aaa;
-  font-size: 13px;
-  padding-left: 20px;
+  margin: 8px 0;
 }
 
-.middle-panel {
-  /* 用于后续拓展：标签列表或预览等 */
-}
-.right-panel {
-  background: #fff;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
-  min-height: 400px;
-  padding: 30px;
-  word-break: break-all;
-}
-.note-detail-header {
-  border-bottom:1px solid #e0e0e0;
-  margin-bottom: 15px;
-  padding-bottom: 8px;
-}
-.note-detail-content {
-  margin-top: 18px;
-  font-size: 15px;
-}
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+.node-label {
+  border-radius: 18px;
+  padding: 8px 12px;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  z-index: 1000;
+  gap: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease;
 }
-.modal-content {
-  background: white;
-  padding: 30px;
-  border-radius: 10px;
-  min-width: 400px;
-  max-width: 90%;
+
+.node-label:hover {
+  background: rgba(34, 238, 153, 0.07);
 }
-.modal.large .modal-content {
-  min-width: 600px;
+
+.node-label.active,
+.tree-node.active-note > .node-label {
+  background: rgba(34, 238, 153, 0.15);
 }
-.modal-content h3 {
-  margin: 0 0 20px 0;
-  color: #333;
-}
-.modal-content input[type="text"],
-.modal-content select,
-.modal-content textarea {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #e0e0e0;
-  border-radius: 5px;
-  font-size: 14px;
-  margin-bottom: 15px;
-}
-.note-title-input {
-  font-size: 16px;
-  font-weight: bold;
-}
-.note-type-selector {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 15px;
-}
-.note-type-selector label {
+
+.node-main {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.node-focus {
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--text-strong);
   cursor: pointer;
 }
-.editor-container textarea {
-  font-family: monospace;
-  resize: vertical;
+
+.expand-trigger {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--line-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  cursor: pointer;
 }
+
+.chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 1px solid var(--text-muted);
+  border-bottom: 1px solid var(--text-muted);
+  transform: rotate(-45deg);
+  transition: transform 0.2s ease;
+}
+
+.chevron.open {
+  transform: rotate(45deg);
+}
+
+.icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--brand-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.icon-folder::after,
+.icon-notebook::after,
+.icon-note::after {
+  content: '';
+  display: block;
+  width: 12px;
+  height: 8px;
+  border: 1px solid var(--brand-primary);
+  border-radius: 2px;
+}
+
+.icon-folder::after {
+  width: 14px;
+  height: 10px;
+}
+
+.icon-notebook::after {
+  border-left-width: 2px;
+}
+
+.icon-note::after {
+  border-top: none;
+}
+
+.note-node .node-main {
+  gap: 12px;
+}
+
+.item-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.tree-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 6px 0 6px 24px;
+}
+
+.middle-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.info-card {
+  padding: 18px;
+  border-radius: 24px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-muted);
+}
+
+.info-card h3 {
+  margin: 4px 0;
+  font-size: 18px;
+  color: var(--text-strong);
+}
+
+.info-card .muted {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.right-panel {
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.right-panel.empty {
+  align-items: flex-start;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.right-panel.empty p {
+  margin: 0 0 6px;
+  font-size: 18px;
+  color: var(--text-strong);
+}
+
+.note-detail-header {
+  border-bottom: 1px solid var(--line-soft);
+  padding-bottom: 12px;
+}
+
+.note-detail-header h3 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  color: var(--text-strong);
+}
+
+.note-detail-content {
+  font-size: 15px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.text-link {
+  color: var(--brand-primary);
+  font-weight: 600;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 28, 23, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  z-index: 1000;
+}
+
+.modal-card {
+  width: min(520px, 100%);
+  background: var(--surface-base);
+  border-radius: 28px;
+  border: 1px solid var(--line-soft);
+  padding: 32px;
+  box-shadow: 0 30px 70px rgba(17, 28, 23, 0.2);
+}
+
+.modal.large .modal-card {
+  width: min(720px, 100%);
+}
+
+.modal-card h3 {
+  margin: 0 0 18px;
+  font-size: 22px;
+  color: var(--text-strong);
+}
+
+.modal-card input[type='text'],
+.modal-card select,
+.modal-card textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-muted);
+  font-size: 15px;
+  color: var(--text-strong);
+  margin-bottom: 16px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.modal-card input:focus,
+.modal-card select:focus,
+.modal-card textarea:focus {
+  outline: none;
+  border-color: var(--brand-primary);
+  background: #fff;
+}
+
+.note-title-input {
+  font-weight: 600;
+}
+
+.note-type-selector {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 16px;
+  color: var(--text-secondary);
+}
+
+.editor-container textarea {
+  font-family: Menlo, Consolas, monospace;
+  resize: vertical;
+  min-height: 200px;
+}
+
 .upload-container {
   padding: 20px;
-  border: 2px dashed #e0e0e0;
-  border-radius: 5px;
+  border: 1px dashed var(--line-soft);
+  border-radius: 18px;
   text-align: center;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
+  background: var(--surface-muted);
 }
+
 .uploaded-file {
   margin-top: 10px;
-  color: #00bcd4;
-  font-weight: bold;
+  color: var(--text-secondary);
 }
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
+  gap: 12px;
+  margin-top: 10px;
 }
-.modal-actions button {
-  padding: 8px 20px;
-  border: 1px solid #e0e0e0;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.3s;
+
+@media (max-width: 1100px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar-tree,
+  .middle-panel,
+  .right-panel {
+    max-height: none;
+  }
+
+  .hero-search {
+    width: 100%;
+  }
+
+  .workspace-hero {
+    flex-direction: column;
+  }
 }
-.modal-actions button:hover {
-  background: #f5f5f5;
-}
-.modal-actions button.primary {
-  background: #00bcd4;
-  color: white;
-  border-color: #00bcd4;
-}
-.modal-actions button.primary:hover {
-  background: #00acc1;
+
+@media (max-width: 640px) {
+  .workspace-page {
+    padding: 32px 20px 80px;
+  }
+
+  .workspace-hero,
+  .sidebar-tree,
+  .middle-panel,
+  .right-panel {
+    border-radius: 24px;
+    padding: 24px;
+  }
+
+  .node-label {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .item-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }
 </style>

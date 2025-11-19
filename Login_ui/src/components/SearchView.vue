@@ -1,48 +1,76 @@
 <template>
-  <div class="search-container">
-    <div class="search-header">
-      <h2>查询笔记</h2>
-    </div>
-
-    <!-- 搜索框 -->
-    <div class="search-box">
-      <input 
-        v-model="searchQuery"
-        type="text" 
-        class="search-input"
-        placeholder="可输入笔记、笔记本、空间、标签、用户查询"
-        @keyup.enter="handleSearch"
-      />
-      <button class="search-btn" @click="handleSearch">
-        🔍 搜索
-      </button>
-    </div>
-
-    <!-- 搜索结果区域 -->
-    <div class="search-results">
-      <div v-if="loading" class="loading">搜索中...</div>
-      
-      <div v-else-if="searchResults.length > 0" class="results-list">
-        <div 
-          v-for="result in searchResults" 
-          :key="result.id"
-          class="result-item"
-        >
-          <div class="result-type">{{ result.type }}</div>
-          <div class="result-title">{{ result.title }}</div>
-          <div class="result-info">{{ result.info }}</div>
+  <div class="search-page">
+    <section class="search-panel">
+      <header class="panel-header">
+        <div>
+          <p class="section-label">全局检索</p>
+          <div class="title-row">
+            <h2>查询笔记</h2>
+            <span class="active-indicator">Search</span>
+          </div>
+          <p class="panel-subtext">
+            支持笔记、笔记本、空间、标签与用户的统一搜索，输入关键词即可快速定位内容。
+          </p>
         </div>
+      </header>
+
+      <div class="search-bar">
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="可输入笔记、笔记本、空间、标签、用户查询"
+          @keyup.enter="handleSearch"
+        />
+        <button class="text-action" @click="handleSearch">
+          <span>开始搜索</span>
+          <span aria-hidden="true">↗</span>
+        </button>
       </div>
 
-      <div v-else-if="hasSearched" class="no-results">
-        暂无搜索结果
+      <div class="hint-row">
+        <span>快速提示：</span>
+        <ul>
+          <li># 笔记</li>
+          <li># 笔记本</li>
+          <li># 空间</li>
+          <li># 标签</li>
+          <li># 用户</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="results-panel">
+      <div v-if="loading" class="state-card">
+        <span class="loader" aria-hidden="true"></span>
+        <p>搜索中...</p>
+        <small>正在为你定位匹配内容</small>
       </div>
 
-      <div v-else class="placeholder">
-        <p>💡 在上方输入关键词开始搜索</p>
-        <p class="tip">支持搜索：笔记标题、笔记本名称、空间名称、标签、用户名</p>
+      <div v-else-if="searchResults.length > 0" class="results-list">
+        <article
+          v-for="result in searchResults"
+          :key="result.id"
+          class="result-card"
+        >
+          <header class="result-head">
+            <span class="result-type">{{ result.type }}</span>
+            <span class="result-indicator" aria-hidden="true">↗</span>
+          </header>
+          <h3 class="result-title">{{ result.title }}</h3>
+          <p class="result-info">{{ result.info }}</p>
+        </article>
       </div>
-    </div>
+
+      <div v-else-if="hasSearched" class="state-card">
+        <p>暂无搜索结果</p>
+        <small>尝试更换关键词或缩短描述</small>
+      </div>
+
+      <div v-else class="state-card placeholder">
+        <p>在上方输入关键词开始搜索</p>
+        <small>支持搜索：笔记标题、笔记本名称、空间名称、标签、用户名</small>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -106,122 +134,268 @@ const handleSearch = async () => {
 </script>
 
 <style scoped>
-.search-container {
-  max-width: 1000px;
+:global(:root) {
+  --brand-primary: #22ee99;
+  --surface-base: #ffffff;
+  --surface-muted: #f7faf8;
+  --line-soft: #e6ece8;
+  --text-strong: #111c17;
+  --text-secondary: #4b5a53;
+  --text-muted: #90a19b;
+}
+
+.search-page {
+  min-height: 100vh;
+  padding: 60px 24px 100px;
+  background: var(--surface-muted);
+  display: grid;
+  gap: 32px;
+}
+
+.search-panel,
+.results-panel {
+  width: min(960px, 100%);
   margin: 0 auto;
+  background: var(--surface-base);
+  border: 1px solid var(--line-soft);
+  border-radius: 36px;
+  padding: 36px;
+  box-shadow: 0 25px 80px rgba(17, 28, 23, 0.08);
 }
 
-.search-header h2 {
-  color: #333;
-  margin-bottom: 20px;
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
 }
 
-.search-box {
+.section-label {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.panel-header h2 {
+  margin: 8px 0 4px;
+  font-size: 36px;
+  color: var(--text-strong);
+}
+
+.active-indicator {
+  padding: 4px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--brand-primary);
+  color: var(--brand-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.panel-subtext {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-secondary);
+}
+
+.search-bar {
+  margin-top: 32px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 6px 6px 6px 22px;
+  background: var(--surface-muted);
+}
+
+.search-bar input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  color: var(--text-strong);
+  padding: 12px 0;
+}
+
+.search-bar input:focus {
+  outline: none;
+}
+
+.text-action {
+  appearance: none;
+  border: none;
+  background: var(--surface-base);
+  border-radius: 999px;
+  padding: 12px 20px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 15px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.text-action:hover,
+.text-action:focus-visible {
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+
+.hint-row {
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.hint-row ul {
   display: flex;
   gap: 10px;
-  margin-bottom: 30px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
 
-.search-input {
-  flex: 1;
-  padding: 12px 20px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 0.3s;
+.hint-row li {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px dashed var(--line-soft);
 }
 
-.search-input:focus {
-  outline: none;
-  border-color: #00bcd4;
-}
-
-.search-btn {
-  padding: 12px 30px;
-  background: #00bcd4;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  cursor: pointer;
-  transition: background 0.3s;
-}
-
-.search-btn:hover {
-  background: #00acc1;
-}
-
-.search-results {
-  min-height: 400px;
-}
-
-.loading {
-  text-align: center;
-  padding: 50px;
-  color: #666;
+.results-panel {
+  min-height: 420px;
 }
 
 .results-list {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 18px;
 }
 
-.result-item {
-  padding: 20px;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
+.result-card {
+  padding: 24px;
+  border-radius: 28px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-base);
+  transition: border-color 0.2s ease, transform 0.2s ease;
   cursor: pointer;
-  transition: all 0.3s;
 }
 
-.result-item:hover {
-  border-color: #00bcd4;
-  box-shadow: 0 2px 8px rgba(0, 188, 212, 0.2);
+.result-card:hover {
+  border-color: var(--brand-primary);
+  transform: translateY(-2px);
+}
+
+.result-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
 }
 
 .result-type {
-  display: inline-block;
-  padding: 4px 12px;
-  background: #00bcd4;
-  color: white;
-  border-radius: 12px;
-  font-size: 12px;
-  margin-bottom: 8px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-primary);
+}
+
+.result-indicator {
+  font-size: 18px;
+  color: var(--text-muted);
 }
 
 .result-title {
-  font-size: 18px;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 5px;
+  margin: 0 0 6px;
+  font-size: 20px;
+  color: var(--text-strong);
 }
 
 .result-info {
-  color: #666;
+  margin: 0;
   font-size: 14px;
+  color: var(--text-secondary);
 }
 
-.no-results {
+.state-card {
+  border-radius: 28px;
+  border: 1px dashed var(--line-soft);
+  padding: 48px 24px;
   text-align: center;
-  padding: 50px;
-  color: #999;
-  font-size: 16px;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
 }
 
-.placeholder {
-  text-align: center;
-  padding: 80px 20px;
-  color: #999;
-}
-
-.placeholder p {
+.state-card p {
+  margin: 0;
   font-size: 18px;
-  margin: 10px 0;
+  color: var(--text-strong);
 }
 
-.tip {
-  font-size: 14px;
-  color: #bbb;
+.state-card small {
+  color: var(--text-muted);
+}
+
+.loader {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--line-soft);
+  border-top-color: var(--brand-primary);
+  animation: spin 1s linear infinite;
+}
+
+.placeholder small {
+  max-width: 320px;
+  line-height: 1.6;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .search-panel,
+  .results-panel {
+    padding: 28px;
+    border-radius: 28px;
+  }
+
+  .search-bar {
+    flex-direction: column;
+    align-items: stretch;
+    border-radius: 24px;
+    padding: 16px;
+  }
+
+  .text-action {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .hint-row {
+    flex-wrap: wrap;
+  }
+
+  .title-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

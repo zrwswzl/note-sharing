@@ -1,10 +1,15 @@
 <template>
-  <div class="profile-container">
+  <div class="profile-page">
     <div class="profile-card">
-      <div class="profile-header">
-        <div class="avatar">👤</div>
-        <h2>个人信息</h2>
-      </div>
+      <header class="profile-header">
+        <div class="avatar-shell" aria-hidden="true">
+          <span class="avatar-icon"></span>
+        </div>
+        <div class="header-text">
+          <p class="section-label">账户设置</p>
+          <h2>个人信息</h2>
+        </div>
+      </header>
 
       <div class="profile-content">
         <!-- 用户信息显示 -->
@@ -29,11 +34,13 @@
 
         <!-- 操作按钮 -->
         <div class="actions-section">
-          <button class="action-btn change-password" @click="showChangePasswordDialog = true">
-            🔒 修改密码
+          <button class="text-action" @click="showChangePasswordDialog = true">
+            <span>修改密码</span>
+            <span class="action-indicator" aria-hidden="true">↗</span>
           </button>
-          <button class="action-btn logout" @click="handleLogout">
-            🚪 退出登录
+          <button class="text-action danger" @click="handleLogout">
+            <span>退出登录</span>
+            <span class="action-indicator" aria-hidden="true">↗</span>
           </button>
         </div>
       </div>
@@ -43,30 +50,30 @@
     <div v-if="showChangePasswordDialog" class="modal" @click.self="showChangePasswordDialog = false">
       <div class="modal-content">
         <h3>修改密码</h3>
-        
+
         <div class="form-group">
           <label>当前密码</label>
-          <input 
-            v-model="passwordForm.oldPassword" 
-            type="password" 
+          <input
+            v-model="passwordForm.oldPassword"
+            type="password"
             placeholder="请输入当前密码"
           />
         </div>
 
         <div class="form-group">
           <label>新密码</label>
-          <input 
-            v-model="passwordForm.newPassword" 
-            type="password" 
+          <input
+            v-model="passwordForm.newPassword"
+            type="password"
             placeholder="请输入新密码"
           />
         </div>
 
         <div class="form-group">
           <label>确认新密码</label>
-          <input 
-            v-model="passwordForm.confirmPassword" 
-            type="password" 
+          <input
+            v-model="passwordForm.confirmPassword"
+            type="password"
             placeholder="请再次输入新密码"
           />
         </div>
@@ -259,211 +266,303 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.profile-container {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: 20px;
+.profile-page {
+  min-height: 100vh;
+  padding: 48px 20px 80px;
+  background: var(--surface-muted, #f8faf9);
+  display: flex;
+  justify-content: center;
 }
 
 .profile-card {
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  width: min(760px, 100%);
+  background: var(--surface-base, #ffffff);
+  border-radius: 32px;
+  border: 1px solid var(--line-soft, #e8ecec);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
   overflow: hidden;
 }
 
 .profile-header {
-  background: #00bcd4;
-  color: white;
-  padding: 30px;
-  text-align: center;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  padding: 36px 40px 24px;
+  border-bottom: 1px solid var(--line-soft, #e8ecec);
 }
 
-.avatar {
-  font-size: 80px;
-  margin-bottom: 15px;
+.avatar-shell {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  border: 1px solid var(--brand-primary, #22ee99);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
 }
 
-.profile-header h2 {
+.avatar-icon {
+  width: 60%;
+  height: 60%;
+  border-radius: 50%;
+  border: 2px solid var(--brand-primary, #22ee99);
+  position: relative;
+}
+
+.avatar-icon::after {
+  content: '';
+  position: absolute;
+  bottom: -20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120%;
+  height: 50%;
+  border: 2px solid var(--brand-primary, #22ee99);
+  border-top: none;
+  border-radius: 40% 40% 60% 60%;
+}
+
+.header-text h2 {
+  margin: 4px 0 0;
+  font-size: 28px;
+  color: var(--text-strong, #1f2a37);
+}
+
+.section-label {
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted, #8a9199);
   margin: 0;
-  font-size: 24px;
 }
 
 .profile-content {
-  padding: 30px;
+  padding: 32px 40px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
 }
 
 .info-section {
-  margin-bottom: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
 .info-item {
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line-soft, #e8ecec);
 }
 
-.info-item:last-child {
+.info-item:last-of-type {
   border-bottom: none;
+  padding-bottom: 0;
 }
 
 .info-item label {
-  display: block;
-  color: #666;
   font-size: 14px;
-  margin-bottom: 8px;
+  color: var(--text-muted, #8a9199);
+  letter-spacing: 0.05em;
 }
 
 .info-value {
-  font-size: 18px;
-  color: #333;
-  font-weight: 500;
+  font-size: 20px;
+  color: var(--text-strong, #1f2a37);
+  font-weight: 600;
 }
 
 .info-note {
-  color: #999;
-  font-size: 12px;
-  margin-top: 10px;
+  margin: -8px 0 0;
+  font-size: 13px;
+  color: var(--text-muted, #8a9199);
 }
 
 .actions-section {
+  border-top: 1px solid var(--line-soft, #e8ecec);
+  padding-top: 24px;
   display: flex;
   flex-direction: column;
-  gap: 15px;
 }
 
-.action-btn {
-  padding: 15px;
+.text-action {
+  appearance: none;
   border: none;
-  border-radius: 8px;
+  background: transparent;
+  padding: 16px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 16px;
+  color: var(--text-secondary, #4b5563);
   cursor: pointer;
-  transition: all 0.3s;
-  font-weight: 500;
+  transition: color 0.2s ease;
+  border-bottom: 1px solid var(--line-soft, #e8ecec);
 }
 
-.change-password {
-  background: #00bcd4;
-  color: white;
+.text-action:last-child {
+  border-bottom: none;
 }
 
-.change-password:hover {
-  background: #00acc1;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 188, 212, 0.3);
+.text-action:hover,
+.text-action:focus-visible {
+  color: var(--brand-primary, #22ee99);
 }
 
-.logout {
-  background: #f5f5f5;
-  color: #666;
+.text-action.danger {
+  color: var(--text-danger, #c6534c);
 }
 
-.logout:hover {
-  background: #e0e0e0;
-  color: #333;
+.text-action.danger:hover,
+.text-action.danger:focus-visible {
+  color: var(--brand-primary, #22ee99);
+}
+
+.action-indicator {
+  font-size: 18px;
+  color: inherit;
 }
 
 .modal {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
   display: flex;
   justify-content: center;
   align-items: center;
+  padding: 24px;
   z-index: 1000;
 }
 
 .modal-content {
-  background: white;
-  padding: 30px;
-  border-radius: 10px;
-  min-width: 400px;
-  max-width: 90%;
+  width: min(440px, 100%);
+  background: var(--surface-base, #ffffff);
+  border-radius: 28px;
+  border: 1px solid var(--line-soft, #e8ecec);
+  padding: 32px;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.2);
 }
 
 .modal-content h3 {
-  margin: 0 0 20px 0;
-  color: #333;
+  margin: 0 0 16px;
+  font-size: 22px;
+  color: var(--text-strong, #1f2a37);
 }
 
 .modal-content p {
-  margin: 20px 0;
-  color: #666;
-  font-size: 16px;
+  margin: 8px 0 24px;
+  color: var(--text-secondary, #4b5563);
+  font-size: 15px;
 }
 
 .form-group {
-  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
 }
 
 .form-group label {
-  display: block;
-  color: #666;
   font-size: 14px;
-  margin-bottom: 8px;
+  color: var(--text-muted, #8a9199);
 }
 
 .form-group input {
   width: 100%;
-  padding: 10px;
-  border: 1px solid #e0e0e0;
-  border-radius: 5px;
-  font-size: 14px;
+  padding: 12px 14px;
+  font-size: 15px;
+  border-radius: 12px;
+  border: 1px solid var(--line-soft, #e8ecec);
+  background: var(--surface-muted, #f8faf9);
+  transition: border-color 0.2s ease, background 0.2s ease;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: #00bcd4;
+  border-color: var(--brand-primary, #22ee99);
+  background: #fff;
 }
 
 .error-message {
-  padding: 10px;
-  background: #ffebee;
-  color: #c62828;
-  border-radius: 5px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(198, 83, 76, 0.08);
+  color: var(--text-danger, #c6534c);
   font-size: 14px;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
+  gap: 12px;
+  margin-top: 24px;
 }
 
 .modal-actions button {
-  padding: 10px 25px;
-  border: 1px solid #e0e0e0;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.3s;
+  min-width: 110px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--line-soft, #e8ecec);
+  background: transparent;
   font-size: 14px;
+  color: var(--text-secondary, #4b5563);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.modal-actions button:hover {
-  background: #f5f5f5;
+.modal-actions button:hover,
+.modal-actions button:focus-visible {
+  color: var(--brand-primary, #22ee99);
+  border-color: var(--brand-primary, #22ee99);
 }
 
 .modal-actions button.primary {
-  background: #00bcd4;
-  color: white;
-  border-color: #00bcd4;
+  background: var(--brand-primary, #22ee99);
+  border-color: var(--brand-primary, #22ee99);
+  color: #0b1f14;
+  font-weight: 600;
 }
 
-.modal-actions button.primary:hover {
-  background: #00acc1;
+.modal-actions button.primary:hover,
+.modal-actions button.primary:focus-visible {
+  filter: brightness(0.95);
 }
 
-.modal-actions button.danger {
-  background: #f44336;
-  border-color: #f44336;
+.modal-actions button.primary.danger {
+  background: rgba(198, 83, 76, 0.1);
+  border-color: rgba(198, 83, 76, 0.4);
+  color: var(--text-danger, #c6534c);
 }
 
-.modal-actions button.danger:hover {
-  background: #d32f2f;
+.modal-actions button.primary.danger:hover,
+.modal-actions button.primary.danger:focus-visible {
+  background: rgba(198, 83, 76, 0.18);
+  border-color: var(--text-danger, #c6534c);
+}
+
+@media (max-width: 640px) {
+  .profile-card {
+    border-radius: 24px;
+  }
+
+  .profile-header,
+  .profile-content {
+    padding: 24px;
+  }
+
+  .profile-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .avatar-shell {
+    width: 64px;
+    height: 64px;
+  }
 }
 </style>
