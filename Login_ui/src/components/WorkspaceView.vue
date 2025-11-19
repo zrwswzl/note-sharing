@@ -1,689 +1,943 @@
-<template>
-  <div class="workspace-container">
-    <div class="workspace-layout">
-      <!-- 空间列表 -->
-      <div class="panel spaces-panel">
-        <div class="panel-header">
-          <h3>空间</h3>
-          <button class="add-btn" @click="showCreateSpaceDialog = true">+ 新建</button>
-        </div>
-        <div class="list">
-          <div 
-            v-for="space in spaces" 
-            :key="space.id"
-            :class="['list-item', { active: selectedSpace?.id === space.id }]"
-            @click="selectSpace(space)"
-          >
-            <span>📁 {{ space.name }}</span>
-            <div class="item-actions">
-              <button @click.stop="editSpace(space)">✏️</button>
-              <button @click.stop="deleteSpace(space.id)">🗑️</button>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- 笔记本列表 -->
-      <div class="panel notebooks-panel">
-        <div class="panel-header">
-          <h3>笔记本</h3>
-          <button 
-            class="add-btn" 
-            :disabled="!selectedSpace"
-            @click="showCreateNotebookDialog = true"
-          >
-            + 新建
-          </button>
-        </div>
-        <div class="list">
-          <div 
-            v-for="notebook in notebooks" 
-            :key="notebook.id"
-            :class="['list-item', { active: selectedNotebook?.id === notebook.id }]"
-            @click="selectNotebook(notebook)"
-          >
-            <span>📒 {{ notebook.name }}</span>
-            <div class="item-actions">
-              <button @click.stop="moveNotebook(notebook)">📤</button>
-              <button @click.stop="editNotebook(notebook)">✏️</button>
-              <button @click.stop="deleteNotebook(notebook.id)">🗑️</button>
-            </div>
-          </div>
-        </div>
-      </div>
+import { useState } from 'react';
 
-      <!-- 笔记列表 -->
-      <div class="panel notes-panel">
-        <div class="panel-header">
-          <h3>笔记</h3>
-          <button 
-            class="add-btn" 
-            :disabled="!selectedNotebook"
-            @click="showCreateNoteDialog = true"
-          >
-            + 新建
-          </button>
-        </div>
-        <div class="list">
-          <div 
-            v-for="note in notes" 
-            :key="note.id"
-            :class="['list-item', { active: selectedNote?.id === note.id }]"
-            @click="selectNote(note)"
-          >
-            <span>📄 {{ note.title }}</span>
-            <div class="item-actions">
-              <button @click.stop="moveNote(note)">📤</button>
-              <button @click.stop="editNote(note)">✏️</button>
-              <button @click.stop="deleteNote(note.id)">🗑️</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+export default function NoteWorkspace() {
+  // 示例数据
+  const [spaces, setSpaces] = useState([
+    { id: '1', name: '工作空间', createdAt: '2024-01-01' },
+    { id: '2', name: '个人学习', createdAt: '2024-01-02' }
+  ]);
 
-    <!-- 创建空间对话框 -->
-    <div v-if="showCreateSpaceDialog" class="modal" @click.self="showCreateSpaceDialog = false">
-      <div class="modal-content">
-        <h3>{{ editingSpace ? '重命名空间' : '创建新空间' }}</h3>
-        <input v-model="newSpaceName" type="text" placeholder="请输入空间名称" />
-        <div class="modal-actions">
-          <button @click="showCreateSpaceDialog = false">取消</button>
-          <button class="primary" @click="handleCreateOrUpdateSpace">确定</button>
-        </div>
-      </div>
-    </div>
+  const [notebooks, setNotebooks] = useState([
+    { id: 'n1', name: '项目文档', spaceId: '1', createdAt: '2024-01-03' },
+    { id: 'n2', name: '会议记录', spaceId: '1', createdAt: '2024-01-04' },
+    { id: 'n3', name: 'JavaScript', spaceId: '2', createdAt: '2024-01-05' },
+    { id: 'n4', name: 'React学习', spaceId: '2', createdAt: '2024-01-06' }
+  ]);
 
-    <!-- 创建笔记本对话框 -->
-    <div v-if="showCreateNotebookDialog" class="modal" @click.self="showCreateNotebookDialog = false">
-      <div class="modal-content">
-        <h3>{{ editingNotebook ? '重命名笔记本' : '创建新笔记本' }}</h3>
-        <input v-model="newNotebookName" type="text" placeholder="请输入笔记本名称" />
-        <div class="modal-actions">
-          <button @click="showCreateNotebookDialog = false">取消</button>
-          <button class="primary" @click="handleCreateOrUpdateNotebook">确定</button>
-        </div>
-      </div>
-    </div>
+  const [notes, setNotes] = useState([
+    { id: 'note1', title: 'API设计文档', notebookId: 'n1', content: '这是API设计的详细内容，包含了RESTful接口规范、数据格式定义、错误码说明等。\n\n主要接口：\n1. 用户认证接口\n2. 数据查询接口\n3. 数据更新接口', createdAt: '2024-01-06' },
+    { id: 'note2', title: '数据库设计', notebookId: 'n1', content: '数据库表结构设计方案\n\n用户表：\n- id: 主键\n- username: 用户名\n- email: 邮箱\n- created_at: 创建时间', createdAt: '2024-01-07' },
+    { id: 'note3', title: '周会纪要', notebookId: 'n2', content: '本周工作总结：\n1. 完成了用户模块开发\n2. 修复了3个bug\n3. 下周计划开始支付模块', createdAt: '2024-01-08' },
+    { id: 'note4', title: 'Vue3基础', notebookId: 'n3', content: 'Vue3响应式原理学习笔记\n\nProxy vs Object.defineProperty\n- Proxy可以监听数组变化\n- 性能更好', createdAt: '2024-01-09' },
+    { id: 'note5', title: 'Hooks详解', notebookId: 'n4', content: 'React Hooks使用指南\n\nuseState: 状态管理\nuseEffect: 副作用处理\nuseContext: 跨组件通信', createdAt: '2024-01-10' }
+  ]);
 
-    <!-- 移动笔记本对话框 -->
-    <div v-if="showMoveNotebookDialog" class="modal" @click.self="showMoveNotebookDialog = false">
-      <div class="modal-content">
-        <h3>移动笔记本到其他空间</h3>
-        <select v-model="targetSpaceId">
-          <option value="">请选择目标空间</option>
-          <option v-for="space in spaces" :key="space.id" :value="space.id">
-            {{ space.name }}
-          </option>
-        </select>
-        <div class="modal-actions">
-          <button @click="showMoveNotebookDialog = false">取消</button>
-          <button class="primary" @click="handleMoveNotebook">确定</button>
-        </div>
-      </div>
-    </div>
+  // 展开状态
+  const [expandedSpaces, setExpandedSpaces] = useState(new Set(['1', '2']));
+  const [expandedNotebooks, setExpandedNotebooks] = useState(new Set(['n1', 'n3']));
 
-    <!-- 移动笔记对话框 -->
-    <div v-if="showMoveNoteDialog" class="modal" @click.self="showMoveNoteDialog = false">
-      <div class="modal-content">
-        <h3>移动笔记到其他笔记本</h3>
-        <select v-model="targetNotebookId">
-          <option value="">请选择目标笔记本</option>
-          <option v-for="notebook in allNotebooks" :key="notebook.id" :value="notebook.id">
-            {{ notebook.name }} ({{ notebook.spaceName }})
-          </option>
-        </select>
-        <div class="modal-actions">
-          <button @click="showMoveNoteDialog = false">取消</button>
-          <button class="primary" @click="handleMoveNote">确定</button>
-        </div>
-      </div>
-    </div>
+  // 选中状态
+  const [selectedNote, setSelectedNote] = useState(null);
 
-    <!-- 创建/编辑笔记对话框 -->
-    <div v-if="showCreateNoteDialog" class="modal large" @click.self="showCreateNoteDialog = false">
-      <div class="modal-content">
-        <h3>{{ editingNote ? '编辑笔记' : '创建新笔记' }}</h3>
-        <input v-model="newNoteTitle" type="text" placeholder="请输入笔记标题" class="note-title-input" />
-        
-        <div class="note-type-selector">
-          <label>
-            <input type="radio" v-model="noteType" value="editor" /> 在线编辑
-          </label>
-          <label>
-            <input type="radio" v-model="noteType" value="upload" /> 上传文件
-          </label>
-        </div>
+  // 对话框状态
+  const [showCreateSpaceDialog, setShowCreateSpaceDialog] = useState(false);
+  const [showCreateNotebookDialog, setShowCreateNotebookDialog] = useState(false);
+  const [showCreateNoteDialog, setShowCreateNoteDialog] = useState(false);
+  const [showMoveNotebookDialog, setShowMoveNotebookDialog] = useState(false);
+  const [showMoveNoteDialog, setShowMoveNoteDialog] = useState(false);
 
-        <div v-if="noteType === 'editor'" class="editor-container">
-          <textarea 
-            v-model="noteContent" 
-            placeholder="请输入笔记内容（支持富文本）"
-            rows="10"
-          ></textarea>
-        </div>
+  // 编辑状态
+  const [editingItem, setEditingItem] = useState(null);
+  const [editingType, setEditingType] = useState(null);
 
-        <div v-if="noteType === 'upload'" class="upload-container">
-          <input type="file" @change="handleFileUpload" accept=".txt,.md,.pdf,.doc,.docx" />
-          <p v-if="uploadedFile" class="uploaded-file">已选择: {{ uploadedFile.name }}</p>
-        </div>
+  // 表单数据
+  const [formData, setFormData] = useState({
+    name: '',
+    title: '',
+    content: '',
+    targetSpaceId: '',
+    targetNotebookId: '',
+    noteType: 'editor'
+  });
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [currentSpaceId, setCurrentSpaceId] = useState(null);
+  const [currentNotebookId, setCurrentNotebookId] = useState(null);
 
-        <div class="modal-actions">
-          <button @click="showCreateNoteDialog = false">取消</button>
-          <button class="primary" @click="handleCreateOrUpdateNote">确定</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</template>
-
-<script setup>
-import { ref, computed } from 'vue'
-
-// 数据
-const spaces = ref([])
-const notebooks = ref([])
-const notes = ref([])
-const allNotebooks = ref([]) // 用于移动笔记时显示所有笔记本
-
-// 选中的项
-const selectedSpace = ref(null)
-const selectedNotebook = ref(null)
-const selectedNote = ref(null)
-
-// 对话框显示状态
-const showCreateSpaceDialog = ref(false)
-const showCreateNotebookDialog = ref(false)
-const showCreateNoteDialog = ref(false)
-const showMoveNotebookDialog = ref(false)
-const showMoveNoteDialog = ref(false)
-
-// 编辑状态
-const editingSpace = ref(null)
-const editingNotebook = ref(null)
-const editingNote = ref(null)
-
-// 表单数据
-const newSpaceName = ref('')
-const newNotebookName = ref('')
-const newNoteTitle = ref('')
-const noteContent = ref('')
-const noteType = ref('editor')
-const uploadedFile = ref(null)
-const targetSpaceId = ref('')
-const targetNotebookId = ref('')
-
-/**
- * API: 获取所有空间
- * GET /api/spaces
- * 输出: {
- *   code: number,
- *   data: [{ id: string, name: string, createdAt: string }]
- * }
- */
-const loadSpaces = async () => {
-  // 调用API加载空间列表
-}
-
-/**
- * API: 创建空间
- * POST /api/spaces
- * 输入: { name: string }
- * 输出: { code: number, data: { id: string, name: string } }
- */
-/**
- * API: 更新空间
- * PUT /api/spaces/:id
- * 输入: { name: string }
- * 输出: { code: number, message: string }
- */
-const handleCreateOrUpdateSpace = async () => {
-  if (!newSpaceName.value.trim()) return
-  
-  if (editingSpace.value) {
-    // 更新空间
-    console.log('更新空间:', editingSpace.value.id, newSpaceName.value)
-  } else {
-    // 创建空间
-    console.log('创建空间:', newSpaceName.value)
-  }
-  
-  newSpaceName.value = ''
-  editingSpace.value = null
-  showCreateSpaceDialog.value = false
-  loadSpaces()
-}
-
-/**
- * API: 删除空间
- * DELETE /api/spaces/:id
- * 输出: { code: number, message: string }
- */
-const deleteSpace = async (id) => {
-  if (confirm('确定要删除此空间吗?')) {
-    console.log('删除空间:', id)
-    loadSpaces()
-  }
-}
-
-const editSpace = (space) => {
-  editingSpace.value = space
-  newSpaceName.value = space.name
-  showCreateSpaceDialog.value = true
-}
-
-const selectSpace = (space) => {
-  selectedSpace.value = space
-  selectedNotebook.value = null
-  selectedNote.value = null
-  loadNotebooks(space.id)
-}
-
-/**
- * API: 获取空间下的笔记本
- * GET /api/spaces/:spaceId/notebooks
- * 输出: {
- *   code: number,
- *   data: [{ id: string, name: string, spaceId: string, createdAt: string }]
- * }
- */
-const loadNotebooks = async (spaceId) => {
-  // 调用API加载笔记本列表
-}
-
-/**
- * API: 创建笔记本
- * POST /api/notebooks
- * 输入: { name: string, spaceId: string }
- * 输出: { code: number, data: { id: string, name: string } }
- */
-/**
- * API: 更新笔记本
- * PUT /api/notebooks/:id
- * 输入: { name: string }
- * 输出: { code: number, message: string }
- */
-const handleCreateOrUpdateNotebook = async () => {
-  if (!newNotebookName.value.trim()) return
-  
-  if (editingNotebook.value) {
-    console.log('更新笔记本:', editingNotebook.value.id, newNotebookName.value)
-  } else {
-    console.log('创建笔记本:', newNotebookName.value, selectedSpace.value.id)
-  }
-  
-  newNotebookName.value = ''
-  editingNotebook.value = null
-  showCreateNotebookDialog.value = false
-  loadNotebooks(selectedSpace.value.id)
-}
-
-/**
- * API: 删除笔记本
- * DELETE /api/notebooks/:id
- * 输出: { code: number, message: string }
- */
-const deleteNotebook = async (id) => {
-  if (confirm('确定要删除此笔记本吗?')) {
-    console.log('删除笔记本:', id)
-    loadNotebooks(selectedSpace.value.id)
-  }
-}
-
-const editNotebook = (notebook) => {
-  editingNotebook.value = notebook
-  newNotebookName.value = notebook.name
-  showCreateNotebookDialog.value = true
-}
-
-/**
- * API: 移动笔记本到其他空间
- * PUT /api/notebooks/:id/move
- * 输入: { targetSpaceId: string }
- * 输出: { code: number, message: string }
- */
-const moveNotebook = (notebook) => {
-  editingNotebook.value = notebook
-  targetSpaceId.value = ''
-  showMoveNotebookDialog.value = true
-}
-
-const handleMoveNotebook = async () => {
-  if (!targetSpaceId.value) return
-  
-  console.log('移动笔记本:', editingNotebook.value.id, '到空间:', targetSpaceId.value)
-  
-  showMoveNotebookDialog.value = false
-  editingNotebook.value = null
-  targetSpaceId.value = ''
-}
-
-const selectNotebook = (notebook) => {
-  selectedNotebook.value = notebook
-  selectedNote.value = null
-  loadNotes(notebook.id)
-}
-
-/**
- * API: 获取笔记本下的笔记
- * GET /api/notebooks/:notebookId/notes
- * 输出: {
- *   code: number,
- *   data: [{ id: string, title: string, notebookId: string, createdAt: string, updatedAt: string }]
- * }
- */
-const loadNotes = async (notebookId) => {
-  // 调用API加载笔记列表
-}
-
-/**
- * API: 创建笔记(在线编辑)
- * POST /api/notes
- * 输入: { title: string, content: string, notebookId: string, type: 'editor' }
- * 输出: { code: number, data: { id: string, title: string } }
- */
-/**
- * API: 创建笔记(上传文件)
- * POST /api/notes/upload
- * 输入: FormData { title: string, file: File, notebookId: string, type: 'upload' }
- * 输出: { code: number, data: { id: string, title: string, fileUrl: string } }
- */
-/**
- * API: 更新笔记
- * PUT /api/notes/:id
- * 输入: { title: string, content: string }
- * 输出: { code: number, message: string }
- */
-const handleCreateOrUpdateNote = async () => {
-  if (!newNoteTitle.value.trim()) return
-  
-  if (editingNote.value) {
-    console.log('更新笔记:', editingNote.value.id)
-  } else {
-    if (noteType.value === 'editor') {
-      console.log('创建笔记(编辑):', newNoteTitle.value, noteContent.value)
+  // 树形结构操作
+  const toggleSpace = (spaceId) => {
+    const newExpanded = new Set(expandedSpaces);
+    if (newExpanded.has(spaceId)) {
+      newExpanded.delete(spaceId);
     } else {
-      console.log('创建笔记(上传):', newNoteTitle.value, uploadedFile.value)
+      newExpanded.add(spaceId);
     }
-  }
-  
-  newNoteTitle.value = ''
-  noteContent.value = ''
-  uploadedFile.value = null
-  editingNote.value = null
-  showCreateNoteDialog.value = false
-  loadNotes(selectedNotebook.value.id)
-}
+    setExpandedSpaces(newExpanded);
+  };
 
-/**
- * API: 删除笔记
- * DELETE /api/notes/:id
- * 输出: { code: number, message: string }
- */
-const deleteNote = async (id) => {
-  if (confirm('确定要删除此笔记吗?')) {
-    console.log('删除笔记:', id)
-    loadNotes(selectedNotebook.value.id)
-  }
-}
+  const toggleNotebook = (notebookId) => {
+    const newExpanded = new Set(expandedNotebooks);
+    if (newExpanded.has(notebookId)) {
+      newExpanded.delete(notebookId);
+    } else {
+      newExpanded.add(notebookId);
+    }
+    setExpandedNotebooks(newExpanded);
+  };
 
-const editNote = (note) => {
-  editingNote.value = note
-  newNoteTitle.value = note.title
-  noteContent.value = note.content || ''
-  noteType.value = 'editor'
-  showCreateNoteDialog.value = true
-}
+  const getNotebooksInSpace = (spaceId) => {
+    return notebooks.filter(nb => nb.spaceId === spaceId);
+  };
 
-/**
- * API: 移动笔记到其他笔记本
- * PUT /api/notes/:id/move
- * 输入: { targetNotebookId: string }
- * 输出: { code: number, message: string }
- */
-const moveNote = (note) => {
-  editingNote.value = note
-  targetNotebookId.value = ''
-  showMoveNoteDialog.value = true
-  loadAllNotebooks()
-}
+  const getNotesInNotebook = (notebookId) => {
+    return notes.filter(n => n.notebookId === notebookId);
+  };
 
-/**
- * API: 获取所有笔记本(跨空间)
- * GET /api/notebooks
- * 输出: {
- *   code: number,
- *   data: [{ id: string, name: string, spaceName: string }]
- * }
- */
-const loadAllNotebooks = async () => {
-  // 调用API加载所有笔记本
-}
+  // 空间操作
+  const handleCreateSpace = () => {
+    setEditingItem(null);
+    setEditingType('space');
+    setFormData({ ...formData, name: '' });
+    setShowCreateSpaceDialog(true);
+  };
 
-const handleMoveNote = async () => {
-  if (!targetNotebookId.value) return
-  
-  console.log('移动笔记:', editingNote.value.id, '到笔记本:', targetNotebookId.value)
-  
-  showMoveNoteDialog.value = false
-  editingNote.value = null
-  targetNotebookId.value = ''
-}
+  const handleEditSpace = (space, e) => {
+    e.stopPropagation();
+    setEditingItem(space);
+    setEditingType('space');
+    setFormData({ ...formData, name: space.name });
+    setShowCreateSpaceDialog(true);
+  };
 
-const selectNote = (note) => {
-  selectedNote.value = note
-  // 这里可以显示笔记详情或打开编辑器
-}
-//编辑器
-const handleFileUpload = (event) => {
-  uploadedFile.value = event.target.files[0]
-}
-</script>
+  const handleDeleteSpace = (spaceId, e) => {
+    e.stopPropagation();
+    if (window.confirm('确定要删除此空间吗？将同时删除其下所有笔记本和笔记。')) {
+      setSpaces(spaces.filter(s => s.id !== spaceId));
+      setNotebooks(notebooks.filter(nb => nb.spaceId !== spaceId));
+      console.log('删除空间:', spaceId);
+    }
+  };
 
-<style scoped>
-.workspace-container {
-  height: 100%;
-}
+  const handleSaveSpace = () => {
+    if (!formData.name.trim()) {
+      alert('请输入空间名称');
+      return;
+    }
 
-.workspace-layout {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 20px;
-  height: 100%;
-}
+    if (editingItem) {
+      setSpaces(spaces.map(s => s.id === editingItem.id ? { ...s, name: formData.name } : s));
+      console.log('更新空间:', editingItem.id, formData.name);
+    } else {
+      const newSpace = {
+        id: 'space_' + Date.now(),
+        name: formData.name,
+        createdAt: new Date().toISOString()
+      };
+      setSpaces([...spaces, newSpace]);
+      console.log('创建空间:', formData.name);
+    }
 
-.panel {
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
+    setShowCreateSpaceDialog(false);
+    setFormData({ ...formData, name: '' });
+  };
 
-.panel-header {
-  background: #00bcd4;
-  color: white;
-  padding: 15px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+  // 笔记本操作
+  const handleCreateNotebook = (space, e) => {
+    e.stopPropagation();
+    setCurrentSpaceId(space.id);
+    setEditingItem(null);
+    setEditingType('notebook');
+    setFormData({ ...formData, name: '' });
+    setShowCreateNotebookDialog(true);
+  };
 
-.panel-header h3 {
-  margin: 0;
-  font-size: 18px;
-}
+  const handleEditNotebook = (notebook, e) => {
+    e.stopPropagation();
+    setEditingItem(notebook);
+    setEditingType('notebook');
+    setFormData({ ...formData, name: notebook.name });
+    setShowCreateNotebookDialog(true);
+  };
 
-.add-btn {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  border: none;
-  padding: 6px 15px;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background 0.3s;
-}
+  const handleDeleteNotebook = (notebookId, e) => {
+    e.stopPropagation();
+    if (window.confirm('确定要删除此笔记本吗？将同时删除其下所有笔记。')) {
+      setNotebooks(notebooks.filter(nb => nb.id !== notebookId));
+      setNotes(notes.filter(n => n.notebookId !== notebookId));
+      console.log('删除笔记本:', notebookId);
+    }
+  };
 
-.add-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.3);
-}
+  const handleMoveNotebook = (notebook, e) => {
+    e.stopPropagation();
+    setEditingItem(notebook);
+    setFormData({ ...formData, targetSpaceId: '' });
+    setShowMoveNotebookDialog(true);
+  };
 
-.add-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+  const handleSaveNotebook = () => {
+    if (!formData.name.trim()) {
+      alert('请输入笔记本名称');
+      return;
+    }
 
-.list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
-}
+    if (editingItem) {
+      setNotebooks(notebooks.map(nb => nb.id === editingItem.id ? { ...nb, name: formData.name } : nb));
+      console.log('更新笔记本:', editingItem.id, formData.name);
+    } else {
+      const newNotebook = {
+        id: 'notebook_' + Date.now(),
+        name: formData.name,
+        spaceId: currentSpaceId,
+        createdAt: new Date().toISOString()
+      };
+      setNotebooks([...notebooks, newNotebook]);
+      console.log('创建笔记本:', formData.name, '在空间:', currentSpaceId);
+    }
 
-.list-item {
-  padding: 12px 15px;
-  margin-bottom: 8px;
-  border: 1px solid #e0e0e0;
-  border-radius: 5px;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: all 0.3s;
-}
+    setShowCreateNotebookDialog(false);
+    setFormData({ ...formData, name: '' });
+  };
 
-.list-item:hover {
-  background: #f5f5f5;
-}
+  const handleConfirmMoveNotebook = () => {
+    if (!formData.targetSpaceId) {
+      alert('请选择目标空间');
+      return;
+    }
 
-.list-item.active {
-  background: #e0f7fa;
-  border-color: #00bcd4;
-}
+    setNotebooks(notebooks.map(nb => 
+      nb.id === editingItem.id ? { ...nb, spaceId: formData.targetSpaceId } : nb
+    ));
+    console.log('移动笔记本:', editingItem.id, '到空间:', formData.targetSpaceId);
 
-.item-actions {
-  display: flex;
-  gap: 5px;
-}
+    setShowMoveNotebookDialog(false);
+    setFormData({ ...formData, targetSpaceId: '' });
+  };
 
-.item-actions button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 16px;
-  padding: 4px;
-  opacity: 0.6;
-  transition: opacity 0.3s;
-}
+  // 笔记操作
+  const handleCreateNote = (notebook, e) => {
+    e.stopPropagation();
+    setCurrentNotebookId(notebook.id);
+    setEditingItem(null);
+    setEditingType('note');
+    setFormData({ ...formData, title: '', content: '', noteType: 'editor' });
+    setUploadedFile(null);
+    setShowCreateNoteDialog(true);
+  };
 
-.item-actions button:hover {
-  opacity: 1;
-}
+  const handleEditNote = (note, e) => {
+    e.stopPropagation();
+    setEditingItem(note);
+    setEditingType('note');
+    setFormData({ ...formData, title: note.title, content: note.content || '', noteType: 'editor' });
+    setShowCreateNoteDialog(true);
+  };
 
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
+  const handleDeleteNote = (noteId, e) => {
+    e.stopPropagation();
+    if (window.confirm('确定要删除此笔记吗？')) {
+      setNotes(notes.filter(n => n.id !== noteId));
+      if (selectedNote?.id === noteId) {
+        setSelectedNote(null);
+      }
+      console.log('删除笔记:', noteId);
+    }
+  };
 
-.modal-content {
-  background: white;
-  padding: 30px;
-  border-radius: 10px;
-  min-width: 400px;
-  max-width: 90%;
-}
+  const handleMoveNote = (note, e) => {
+    e.stopPropagation();
+    setEditingItem(note);
+    setFormData({ ...formData, targetNotebookId: '' });
+    setShowMoveNoteDialog(true);
+  };
 
-.modal.large .modal-content {
-  min-width: 600px;
-}
+  const handleSaveNote = () => {
+    if (!formData.title.trim()) {
+      alert('请输入笔记标题');
+      return;
+    }
 
-.modal-content h3 {
-  margin: 0 0 20px 0;
-  color: #333;
-}
+    if (editingItem) {
+      setNotes(notes.map(n => 
+        n.id === editingItem.id 
+          ? { ...n, title: formData.title, content: formData.content, updatedAt: new Date().toISOString() }
+          : n
+      ));
+      if (selectedNote?.id === editingItem.id) {
+        setSelectedNote({ ...selectedNote, title: formData.title, content: formData.content });
+      }
+      console.log('更新笔记:', editingItem.id);
+    } else {
+      if (formData.noteType === 'editor') {
+        const newNote = {
+          id: 'note_' + Date.now(),
+          title: formData.title,
+          content: formData.content,
+          notebookId: currentNotebookId,
+          createdAt: new Date().toISOString()
+        };
+        setNotes([...notes, newNote]);
+        console.log('创建笔记(编辑):', formData.title);
+      } else {
+        console.log('创建笔记(上传):', formData.title, uploadedFile);
+        const newNote = {
+          id: 'note_' + Date.now(),
+          title: formData.title,
+          content: `已上传文件: ${uploadedFile?.name}`,
+          notebookId: currentNotebookId,
+          createdAt: new Date().toISOString()
+        };
+        setNotes([...notes, newNote]);
+      }
+    }
 
-.modal-content input[type="text"],
-.modal-content select,
-.modal-content textarea {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #e0e0e0;
-  border-radius: 5px;
-  font-size: 14px;
-  margin-bottom: 15px;
-}
+    setShowCreateNoteDialog(false);
+    setFormData({ ...formData, title: '', content: '' });
+    setUploadedFile(null);
+  };
 
-.note-title-input {
-  font-size: 16px;
-  font-weight: bold;
-}
+  const handleConfirmMoveNote = () => {
+    if (!formData.targetNotebookId) {
+      alert('请选择目标笔记本');
+      return;
+    }
 
-.note-type-selector {
-  display: flex;
-  gap: 20px;
-  margin-bottom: 15px;
-}
+    setNotes(notes.map(n => 
+      n.id === editingItem.id ? { ...n, notebookId: formData.targetNotebookId } : n
+    ));
+    console.log('移动笔记:', editingItem.id, '到笔记本:', formData.targetNotebookId);
 
-.note-type-selector label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-}
+    setShowMoveNoteDialog(false);
+    setFormData({ ...formData, targetNotebookId: '' });
+  };
 
-.editor-container textarea {
-  font-family: monospace;
-  resize: vertical;
-}
+  const selectNote = (note) => {
+    setSelectedNote(note);
+  };
 
-.upload-container {
-  padding: 20px;
-  border: 2px dashed #e0e0e0;
-  border-radius: 5px;
-  text-align: center;
-  margin-bottom: 15px;
-}
+  const handleFileUpload = (e) => {
+    setUploadedFile(e.target.files[0]);
+  };
 
-.uploaded-file {
-  margin-top: 10px;
-  color: #00bcd4;
-  font-weight: bold;
-}
+  const getAllNotebooksWithSpaceName = () => {
+    return notebooks.map(nb => {
+      const space = spaces.find(s => s.id === nb.spaceId);
+      return {
+        ...nb,
+        spaceName: space?.name || '未知空间'
+      };
+    });
+  };
 
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
-}
+  return (
+    <div className="workspace-container">
+      <div className="workspace-layout">
+        <div className="sidebar">
+          <div className="sidebar-header">
+            <h2>我的笔记</h2>
+            <button className="add-btn" onClick={handleCreateSpace}>+ 新建空间</button>
+          </div>
+          
+          <div className="tree-container">
+            {spaces.map(space => (
+              <div key={space.id} className="tree-node">
+                <div className="tree-item space-item">
+                  <button className="expand-btn" onClick={() => toggleSpace(space.id)}>
+                    {expandedSpaces.has(space.id) ? '▼' : '▶'}
+                  </button>
+                  <span className="item-icon">📁</span>
+                  <span className="item-name">{space.name}</span>
+                  <div className="item-actions">
+                    <button onClick={(e) => handleCreateNotebook(space, e)} title="新建笔记本">➕</button>
+                    <button onClick={(e) => handleEditSpace(space, e)} title="重命名">✏️</button>
+                    <button onClick={(e) => handleDeleteSpace(space.id, e)} title="删除">🗑️</button>
+                  </div>
+                </div>
 
-.modal-actions button {
-  padding: 8px 20px;
-  border: 1px solid #e0e0e0;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
+                {expandedSpaces.has(space.id) && (
+                  <div className="tree-children">
+                    {getNotebooksInSpace(space.id).map(notebook => (
+                      <div key={notebook.id} className="tree-node">
+                        <div className="tree-item notebook-item">
+                          <button className="expand-btn" onClick={() => toggleNotebook(notebook.id)}>
+                            {expandedNotebooks.has(notebook.id) ? '▼' : '▶'}
+                          </button>
+                          <span className="item-icon">📒</span>
+                          <span className="item-name">{notebook.name}</span>
+                          <div className="item-actions">
+                            <button onClick={(e) => handleCreateNote(notebook, e)} title="新建笔记">➕</button>
+                            <button onClick={(e) => handleMoveNotebook(notebook, e)} title="移动">📤</button>
+                            <button onClick={(e) => handleEditNotebook(notebook, e)} title="重命名">✏️</button>
+                            <button onClick={(e) => handleDeleteNotebook(notebook.id, e)} title="删除">🗑️</button>
+                          </div>
+                        </div>
 
-.modal-actions button:hover {
-  background: #f5f5f5;
-}
+                        {expandedNotebooks.has(notebook.id) && (
+                          <div className="tree-children">
+                            {getNotesInNotebook(notebook.id).map(note => (
+                              <div key={note.id} className="tree-node">
+                                <div 
+                                  className={`tree-item note-item ${selectedNote?.id === note.id ? 'active' : ''}`}
+                                  onClick={() => selectNote(note)}
+                                >
+                                  <span className="expand-placeholder"></span>
+                                  <span className="item-icon">📄</span>
+                                  <span className="item-name">{note.title}</span>
+                                  <div className="item-actions">
+                                    <button onClick={(e) => handleMoveNote(note, e)} title="移动">📤</button>
+                                    <button onClick={(e) => handleEditNote(note, e)} title="编辑">✏️</button>
+                                    <button onClick={(e) => handleDeleteNote(note.id, e)} title="删除">🗑️</button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
 
-.modal-actions button.primary {
-  background: #00bcd4;
-  color: white;
-  border-color: #00bcd4;
-}
+        <div className="content-area">
+          {!selectedNote ? (
+            <div className="empty-state">
+              <div className="empty-icon">📝</div>
+              <p>选择一个笔记开始查看</p>
+            </div>
+          ) : (
+            <div className="note-viewer">
+              <div className="note-header">
+                <h2>{selectedNote.title}</h2>
+                <button className="edit-btn" onClick={(e) => handleEditNote(selectedNote, e)}>编辑笔记</button>
+              </div>
+              <div className="note-content">
+                {selectedNote.content || '暂无内容'}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
-.modal-actions button.primary:hover {
-  background: #00acc1;
+      {showCreateSpaceDialog && (
+        <div className="modal" onClick={() => setShowCreateSpaceDialog(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>{editingItem ? '重命名空间' : '创建新空间'}</h3>
+            <input 
+              type="text" 
+              placeholder="请输入空间名称" 
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onKeyPress={(e) => e.key === 'Enter' && handleSaveSpace()}
+              autoFocus
+            />
+            <div className="modal-actions">
+              <button onClick={() => setShowCreateSpaceDialog(false)}>取消</button>
+              <button className="primary" onClick={handleSaveSpace}>确定</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateNotebookDialog && (
+        <div className="modal" onClick={() => setShowCreateNotebookDialog(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>{editingItem ? '重命名笔记本' : '创建新笔记本'}</h3>
+            <input 
+              type="text" 
+              placeholder="请输入笔记本名称" 
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onKeyPress={(e) => e.key === 'Enter' && handleSaveNotebook()}
+              autoFocus
+            />
+            <div className="modal-actions">
+              <button onClick={() => setShowCreateNotebookDialog(false)}>取消</button>
+              <button className="primary" onClick={handleSaveNotebook}>确定</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMoveNotebookDialog && (
+        <div className="modal" onClick={() => setShowMoveNotebookDialog(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>移动笔记本到其他空间</h3>
+            <select 
+              value={formData.targetSpaceId}
+              onChange={(e) => setFormData({ ...formData, targetSpaceId: e.target.value })}
+            >
+              <option value="">请选择目标空间</option>
+              {spaces.filter(s => s.id !== editingItem?.spaceId).map(space => (
+                <option key={space.id} value={space.id}>{space.name}</option>
+              ))}
+            </select>
+            <div className="modal-actions">
+              <button onClick={() => setShowMoveNotebookDialog(false)}>取消</button>
+              <button className="primary" onClick={handleConfirmMoveNotebook}>确定</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showMoveNoteDialog && (
+        <div className="modal" onClick={() => setShowMoveNoteDialog(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>移动笔记到其他笔记本</h3>
+            <select 
+              value={formData.targetNotebookId}
+              onChange={(e) => setFormData({ ...formData, targetNotebookId: e.target.value })}
+            >
+              <option value="">请选择目标笔记本</option>
+              {getAllNotebooksWithSpaceName().filter(nb => nb.id !== editingItem?.notebookId).map(notebook => (
+                <option key={notebook.id} value={notebook.id}>
+                  {notebook.name} ({notebook.spaceName})
+                </option>
+              ))}
+            </select>
+            <div className="modal-actions">
+              <button onClick={() => setShowMoveNoteDialog(false)}>取消</button>
+              <button className="primary" onClick={handleConfirmMoveNote}>确定</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCreateNoteDialog && (
+        <div className="modal large" onClick={() => setShowCreateNoteDialog(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3>{editingItem ? '编辑笔记' : '创建新笔记'}</h3>
+            <input 
+              type="text" 
+              placeholder="请输入笔记标题" 
+              className="note-title-input"
+              value={formData.title}
+              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              autoFocus
+            />
+            
+            {!editingItem && (
+              <div className="note-type-selector">
+                <label>
+                  <input 
+                    type="radio" 
+                    value="editor" 
+                    checked={formData.noteType === 'editor'}
+                    onChange={(e) => setFormData({ ...formData, noteType: e.target.value })}
+                  />
+                  在线编辑
+                </label>
+                <label>
+                  <input 
+                    type="radio" 
+                    value="upload" 
+                    checked={formData.noteType === 'upload'}
+                    onChange={(e) => setFormData({ ...formData, noteType: e.target.value })}
+                  />
+                  上传文件
+                </label>
+              </div>
+            )}
+
+            {formData.noteType === 'editor' && (
+              <div className="editor-container">
+                <textarea 
+                  placeholder="请输入笔记内容"
+                  rows="10"
+                  value={formData.content}
+                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                />
+              </div>
+            )}
+
+            {formData.noteType === 'upload' && !editingItem && (
+              <div className="upload-container">
+                <input 
+                  type="file" 
+                  onChange={handleFileUpload} 
+                  accept=".txt,.md,.pdf,.doc,.docx" 
+                />
+                {uploadedFile && <p className="uploaded-file">已选择: {uploadedFile.name}</p>}
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button onClick={() => setShowCreateNoteDialog(false)}>取消</button>
+              <button className="primary" onClick={handleSaveNote}>确定</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        .workspace-container {
+          height: 100vh;
+          background: #f5f5f5;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .workspace-layout {
+          display: grid;
+          grid-template-columns: 350px 1fr;
+          height: 100%;
+        }
+
+        .sidebar {
+          background: white;
+          border-right: 1px solid #e0e0e0;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .sidebar-header {
+          background: linear-gradient(135deg, #00bcd4 0%, #0097a7 100%);
+          color: white;
+          padding: 20px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .sidebar-header h2 {
+          margin: 0;
+          font-size: 20px;
+          font-weight: 600;
+        }
+
+        .add-btn {
+          background: rgba(255, 255, 255, 0.2);
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          transition: all 0.3s;
+          font-weight: 500;
+        }
+
+        .add-btn:hover {
+          background: rgba(255, 255, 255, 0.3);
+          transform: translateY(-1px);
+        }
+
+        .tree-container {
+          flex: 1;
+          overflow-y: auto;
+          padding: 10px;
+        }
+
+        .tree-node {
+          user-select: none;
+        }
+
+        .tree-item {
+          display: flex;
+          align-items: center;
+          padding: 10px 8px;
+          margin: 2px 0;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.2s;
+          position: relative;
+        }
+
+        .tree-item:hover {
+          background: #f5f5f5;
+        }
+
+        .tree-item.active {
+          background: #e0f7fa;
+          border-left: 3px solid #00bcd4;
+        }
+
+        .expand-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 12px;
+          width: 20px;
+          height: 20px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #666;
+          transition: transform 0.2s;
+          flex-shrink: 0;
+        }
+
+        .expand-btn:hover {
+          color: #00bcd4;
+        }
+
+        .expand-placeholder {
+          width: 20px;
+          flex-shrink: 0;
+        }
+
+        .item-icon {
+          font-size: 18px;
+          margin: 0 8px;
+          flex-shrink: 0;
+        }
+
+        .item-name {
+          flex: 1;
+          font-size: 14px;
+          color: #333;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .item-actions {
+          display: none;
+          gap: 4px;
+          margin-left: 8px;
+        }
+
+        .tree-item:hover .item-actions {
+          display: flex;
+        }
+
+        .item-actions button {
+          background: rgba(0, 0, 0, 0.05);
+          border: none;
+          cursor: pointer;
+          font-size: 14px;
+          width: 24px;
+          height: 24px;
+          border-radius: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+        }
+
+        .item-actions button:hover {
+          background: rgba(0, 188, 212, 0.1);
+          transform: scale(1.1);
+        }
+
+        .tree-children {
+          margin-left: 20px;
+        }
+
+        .space-item {
+          font-weight: 600;
+        }
+
+        .notebook-item {
+          font-weight: 500;
+        }
+
+        .note-item {
+          font-weight: normal;
+          font-size: 13px;
+        }
+
+        .content-area {
+          background: white;
+          overflow-y: auto;
+        }
+
+        .empty-state {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          color: #999;
+        }
+
+        .empty-icon {
+          font-size: 80px;
+          margin-bottom: 20px;
+          opacity: 0.3;
+        }
+
+        .empty-state p {
+          font-size: 16px;
+        }
+
+        .note-viewer {
+          padding: 40px;
+          max-width: 900px;
+          margin: 0 auto;
+        }
+
+        .note-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 30px;
+          padding-bottom: 20px;
+          border-bottom: 2px solid #e0e0e0;
+        }
+
+        .note-header h2 {
+          margin: 0;
+          color: #333;
+          font-size: 28px;
+        }
+
+        .edit-btn {
+          background: #00bcd4;
+          color: white;
+          border: none;
+          padding: 10px 24px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+          transition: all 0.3s;
+        }
+
+        .edit-btn:hover {
+          background: #00acc1;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(0,188,212,0.3);
+        }
+
+        .note-content {
+          font-size: 15px;
+          line-height: 1.8;
+          color: #555;
+          white-space: pre-wrap;
+        }
+
+        .modal {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1000;
+        }
+
+        .modal-content {
+          background: white;
+          padding: 30px;
+          border-radius: 10px;
+          min-width: 400px;
+          max-width: 90%;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .modal.large .modal-content {
+          min-width: 600px;
+        }
+
+        .modal-content h3 {
+          margin: 0 0 20px 0;
+          color: #333;
+          font-size: 20px;
+        }
+
+        .modal-content input[type="text"],
+        .modal-content select,
+        .modal-content textarea {
+          width: 100%;
+          padding: 10px;
+          border: 1px solid #e0e0e0;
+          border-radius: 5px;
+          font-size: 14px;
+          margin-bottom: 15px;
+          box-sizing: border-box;
+        }
+
+        .modal-content input[type="text"]:focus,
+        .modal-content select:focus,
+        .modal-content textarea:focus {
+          outline: none;
+          border-color: #00bcd4;
+        }
+
+        .note-title-input {
+          font-size: 16px;
+          font-weight: bold;
+        }
+
+        .note-type-selector {
+          display: flex;
+          gap: 20px;
+          margin-bottom: 15px;
+        }
+
+        .note-type-selector label {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+        }
+
+        .editor-container textarea {
+          font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+          resize: vertical;
+          min-height: 200px;
+        }
+
+        .upload-container {
+          padding: 20px;
+          border: 2px dashed #e0e0e0;
+          border-radius: 5px;
+          text-align: center;
+          margin-bottom: 15px;
+        }
+
+        .uploaded-file {
+          margin-top: 10px;
+          color: #00bcd4;
+          font-weight: bold;
+        }
+
+        .modal-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+          margin-top: 20px;
+        }
+
+        .modal-actions button {
+          padding: 8px 20px;
+          border: 1px solid #e0e0e0;
+          border-radius: 5px;
+          cursor: pointer;
+          transition: all 0.3s;
+          font-size: 14px;
+          background: white;
+        }
+
+        .modal-actions button:hover {
+          background: #f5f5f5;
+        }
+
+        .modal-actions button.primary {
+          background: #00bcd4;
+          color: white;
+          border-color: #00bcd4;
+        }
+
+        .modal-actions button.primary:hover {
+          background: #00acc1;
+        }
+
+        .tree-container::-webkit-scrollbar {
+          width: 8px;
+        }
+
+        .tree-container::-webkit-scrollbar-track {
+          background: #f1f1f1;
+        }
+
+        .tree-container::-webkit-scrollbar-thumb {
+          background: #888;
+          border-radius: 4px;
+        }
+
+        .tree-container::-webkit-scrollbar-thumb:hover {
+          background: #555;
+        }
+      `}</style>
+    </div>
+  );
 }
-</style>
