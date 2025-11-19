@@ -173,13 +173,16 @@
           </label>
         </div>
 
-        <div v-if="noteType === 'editor'" class="editor-container">
-          <textarea 
-            v-model="noteContent" 
-            placeholder="请输入笔记内容（支持富文本）"
-            rows="10"
-          ></textarea>
-        </div>
+            {formData.noteType === 'editor' && (
+              <div className="editor-container">
+                <textarea 
+                  placeholder="请输入笔记内容"
+                  rows="10"
+                  value={formData.content}
+                  onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+                />
+              </div>
+            )}
 
         <div v-if="noteType === 'upload'" class="upload-container">
           <input type="file" @change="handleFileUpload" accept=".txt,.md,.pdf,.doc,.docx" />
