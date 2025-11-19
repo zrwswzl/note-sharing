@@ -138,6 +138,34 @@
           <p class="label">笔记详情</p>
           <h3>{{ selectedNote?.title || '笔记详情' }}</h3>
         </div>
+
+        <div class="note-detail-actions">
+          <div class="action-cluster">
+            <button
+              type="button"
+              class="pill-btn"
+              :class="{ active: noteEngagement.isFavorite }"
+              @click="toggleFavoriteNote"
+            >
+              {{ noteEngagement.isFavorite ? '已收藏' : '收藏笔记' }}
+            </button>
+            <label class="folder-select">
+              <span>收藏夹</span>
+              <select v-model="noteEngagement.folder">
+                <option v-for="folder in favoriteFolderOptions" :key="folder">{{ folder }}</option>
+              </select>
+            </label>
+          </div>
+          <div class="action-cluster">
+            <button type="button" class="pill-btn ghost" @click="toggleInlineComments">
+              查看评论 ({{ noteEngagement.commentCount }})
+            </button>
+            <button type="button" class="pill-btn primary" @click="addQuickComment">
+              写评论
+            </button>
+          </div>
+        </div>
+
         <div class="note-detail-content" v-if="selectedNoteContent.type === 'editor'">
           <div v-html="selectedNoteContent.content"></div>
         </div>
@@ -146,6 +174,20 @@
         </div>
         <div class="note-detail-content" v-else>
           <em>无法展示此类型的内容</em>
+        </div>
+
+        <div v-if="showInlineComments" class="note-inline-comments">
+          <div class="comment-headline">
+            <p>最新评论 ({{ inlineComments.length }})</p>
+            <button type="button" class="text-link" @click="showInlineComments = false">收起</button>
+          </div>
+          <article v-for="comment in inlineComments" :key="comment.id" class="inline-comment">
+            <header>
+              <strong>{{ comment.author }}</strong>
+              <span>{{ comment.createdAt }}</span>
+            </header>
+            <p>{{ comment.content }}</p>
+          </article>
         </div>
       </section>
       <section class="right-panel empty" v-else>
@@ -260,6 +302,43 @@ const selectedSpace = ref(null)
 const selectedNotebook = ref(null)
 const selectedNote = ref(null)
 const selectedNoteContent = ref(null)
+
+/**
+ * API 占位（收藏与评论，仅用于描述接口格式）
+ * - POST /api/notes/{noteId}/favorite
+ *   输入: { folderId: string }
+ *   输出: { code: number, message: string }
+ *   返回码: 200 已收藏 / 400 参数错误 / 401 未登录
+ * - DELETE /api/notes/{noteId}/favorite
+ *   输入: 无
+ *   输出: { code: number, message: string }
+ *   返回码: 200 已取消 / 404 未找到收藏
+ * - GET /api/notes/{noteId}/comments
+ *   输入: 无
+ *   输出: { code: number, data: Comment[] }
+ *   返回码: 200 成功
+ * - POST /api/notes/{noteId}/comments
+ *   输入: { content: string }
+ *   输出: { code: number, data: { commentId: string } }
+ *   返回码: 200 创建成功 / 400 参数错误
+ */
+const favoriteFolderOptions = ['默认收藏', '学习沉淀', '项目灵感', '灵感闪现']
+const noteEngagement = ref({
+  isFavorite: false,
+  folder: favoriteFolderOptions[0],
+  commentCount: 0
+})
+const showInlineComments = ref(false)
+const inlineComments = ref([])
+const commentPresetMap = {
+  '1a1': [
+    { id: 'c-101', author: '林梓萱', content: '这段拆解很清晰，已收藏！', createdAt: '2025-11-16 14:20' },
+    { id: 'c-102', author: '马凡', content: '是否能补充 pinia 的示例？', createdAt: '2025-11-15 09:31' }
+  ],
+  '2a1': [
+    { id: 'c-201', author: '项目组A', content: '附件很实用，感谢分享。', createdAt: '2025-11-10 20:05' }
+  ]
+}
 
 // 对话框及编辑态
 const showCreateSpaceDialog = ref(false)
@@ -401,6 +480,14 @@ const selectNote = async (note, notebook, space) => {
   selectedNote.value = note
   // 展示笔记内容
   selectedNoteContent.value = await fetchNoteDetail(note.id)
+  const preset = commentPresetMap[note.id] || []
+  inlineComments.value = [...preset]
+  noteEngagement.value = {
+    isFavorite: note.id === '1a1',
+    folder: favoriteFolderOptions[0],
+    commentCount: preset.length
+  }
+  showInlineComments.value = false
 }
 
 // 工具栏新建
@@ -619,6 +706,28 @@ const loadAllNotebooksData = async () => {
     { id: '1b', name: '后端', spaceName: '工作' },
     { id: '2a', name: '大学', spaceName: '学习' }
   ]
+}
+
+const toggleFavoriteNote = () => {
+  // TODO: 调用 POST/DELETE /api/notes/{noteId}/favorite
+  noteEngagement.value.isFavorite = !noteEngagement.value.isFavorite
+}
+
+const toggleInlineComments = () => {
+  showInlineComments.value = !showInlineComments.value
+}
+
+const addQuickComment = () => {
+  // TODO: 调用 POST /api/notes/{noteId}/comments
+  const newComment = {
+    id: `temp-${Date.now()}`,
+    author: '我',
+    content: '已添加示例评论，仅为前端展示占位。',
+    createdAt: new Date().toLocaleString()
+  }
+  inlineComments.value = [newComment, ...inlineComments.value]
+  noteEngagement.value.commentCount = inlineComments.value.length
+  showInlineComments.value = true
 }
 
 // 初始化
@@ -975,10 +1084,97 @@ refreshTree()
   color: var(--text-strong);
 }
 
+.note-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 0 6px;
+}
+
+.action-cluster {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.pill-btn {
+  border-radius: 999px;
+  border: 1px solid var(--line-soft);
+  padding: 8px 18px;
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.pill-btn.active,
+.pill-btn.primary {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: #0b1f14;
+  font-weight: 600;
+}
+
+.pill-btn.ghost {
+  background: transparent;
+}
+
+.folder-select {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.folder-select select {
+  border-radius: 999px;
+  border: 1px solid var(--line-soft);
+  padding: 6px 12px;
+  background: var(--surface-soft);
+}
+
 .note-detail-content {
   font-size: 15px;
   color: var(--text-secondary);
   line-height: 1.7;
+}
+
+.note-inline-comments {
+  margin-top: 18px;
+  border-radius: 18px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-muted);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.comment-headline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.inline-comment {
+  border-radius: 16px;
+  border: 1px dashed var(--line-soft);
+  padding: 12px 16px;
+  background: #fff;
+}
+
+.inline-comment header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
 }
 
 .text-link {
