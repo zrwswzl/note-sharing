@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AuthView from '../views/AuthView.vue'
 import MainView from '../views/MainView.vue'
+import AdminView from '../views/AdminView.vue'
 
 const routes = [
   {
@@ -27,6 +28,12 @@ const routes = [
     name: 'Main',
     component: MainView,
     meta: { requiresAuth: true }  // 需要登录才能访问
+  },
+  {
+    path: '/admin',
+    name: 'Admin',
+    component: AdminView,
+    meta: { requiresAuth: true }  // 需管理员身份
   }
 ]
 
