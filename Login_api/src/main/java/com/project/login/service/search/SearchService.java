@@ -35,7 +35,8 @@ public class SearchService {
                                             .query(base -> base
                                                     .multiMatch(m -> m
                                                             .query(keyword)
-                                                            .fields("title^2", "content_summary")
+                                                            // ✅ 修正1：content_summary -> contentSummary
+                                                            .fields("title^2", "contentSummary") 
                                                     )
                                             )
                                             .boostMode(FunctionBoostMode.Sum)
@@ -46,25 +47,34 @@ public class SearchService {
                                                                     .source("""
                                                                         // ========== 综合评分公式 ==========
                                                                         
-                                                                        double safeLong(def field) {
-                                                                            if (field == null) return 0;
-                                                                            return field.value;
+                                                                        // ✅ 修正2：更安全的空值检查 (doc['field'] 不会是 null，要检查 size())
+                                                                        double safeLong(def docs, String fieldName) {
+                                                                            if (!docs.containsKey(fieldName) || docs[fieldName].size() == 0) return 0;
+                                                                            return docs[fieldName].value;
                                                                         }
 
                                                                         double baseScore = _score * 0.5;
 
-                                                                        double views = safeLong(doc['views']);
-                                                                        double likes = safeLong(doc['likes']);
+                                                                        // ✅ 修正3：使用正确的字段名 viewCount, likeCount
+                                                                        double views = safeLong(doc, 'viewCount');
+                                                                        double likes = safeLong(doc, 'likeCount');
+                                                                        
                                                                         double viewsScore = Math.log(views + 1) * 0.2;
                                                                         double likesScore = Math.log(likes + 1) * 0.2;
 
                                                                         long updated = 0L;
-                                                                        if (doc.containsKey("updatedAt") && doc['updatedAt'].size() > 0) {
+                                                                        // 检查 updatedAt 是否存在
+                                                                        if (doc.containsKey('updatedAt') && doc['updatedAt'].size() > 0) {
+                                                                            // ✅ JavaTimeModule 修复后，这里通常可以直接取 value 
+                                                                            // 如果是较新版本 ES，日期字段 value 是 ZonedDateTime，可以直接 .toInstant().toEpochMilli()
+                                                                            // 如果报错，可以尝试 doc['updatedAt'].value.toInstant().toEpochMilli()
+                                                                            // 或者最稳妥的写法（针对 ES 8.x）：
                                                                             updated = doc['updatedAt'].value.toInstant().toEpochMilli();
                                                                         }
 
                                                                         long now = System.currentTimeMillis();
-                                                                        double days = (now - updated) / 86400000.0;
+                                                                        // 防止时间倒流导致的负数
+                                                                        double days = Math.max(0, (now - updated) / 86400000.0);
                                                                         double recency = 1.0 / (days + 1.0);
                                                                         double recencyScore = recency * 0.1;
 

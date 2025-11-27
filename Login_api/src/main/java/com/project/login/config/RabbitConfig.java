@@ -1,5 +1,6 @@
 package com.project.login.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper; // 别忘了导包
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -21,16 +22,17 @@ public class RabbitConfig {
 
     // --- RabbitTemplate ---
     @Bean
-    public RabbitTemplate rabbitTemplate(CachingConnectionFactory connectionFactory) {
+    public RabbitTemplate rabbitTemplate(CachingConnectionFactory connectionFactory,
+            Jackson2JsonMessageConverter converter) { // 1. 这里直接注入转换器
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
-        template.setMessageConverter(jacksonMessageConverter()); // 使用 JSON
+        template.setMessageConverter(converter); // 2. 直接使用注入进来的变量，而不是调用方法
         return template;
     }
 
     // --- JSON 消息转换器 ---
     @Bean
-    public Jackson2JsonMessageConverter jacksonMessageConverter() {
-        return new Jackson2JsonMessageConverter();
+    public Jackson2JsonMessageConverter jacksonMessageConverter(ObjectMapper objectMapper) {
+        return new Jackson2JsonMessageConverter(objectMapper);
     }
 
     // ---------------- 队列 ----------------
