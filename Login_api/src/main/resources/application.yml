@@ -88,3 +88,8 @@ elasticsearch:
   host: localhost
   port: 9200
   scheme: http
+
+
+modelscope:
+  api:
+    key: "ms-3746afb4-3d97-4748-a356-774a71525f47"
