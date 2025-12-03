@@ -457,6 +457,11 @@ const debouncedUpdateNote = debounce(async (meta, file) => {
     // 更新本地的 updatedAt 状态，给用户反馈
     if (currentNote.value && currentNote.value.id === updatedVo.id) {
       currentNote.value.updatedAt = updatedVo.updatedAt;
+      // 同步更新 noteList 中对应笔记的信息
+      const noteInList = noteList.value.find(n => n.id === updatedVo.id);
+      if (noteInList) {
+        Object.assign(noteInList, updatedVo);
+      }
     }
 
     isLoading.value = false;
@@ -538,10 +543,18 @@ const saveNoteContent = async () => {
     // 【API调用点 B】: 手动保存笔记内容 (PUT /noting/notes/update)
     const updatedVo = await updateNote(meta, mdFile);
 
-    if (updatedVo && updatedVo.updatedAt) {
-      currentNote.value.updatedAt = updatedVo.updatedAt;
-    } else {
-      currentNote.value.updatedAt = new Date().toISOString();
+    if (updatedVo) {
+      // 更新 currentNote
+      if (updatedVo.updatedAt) {
+        currentNote.value.updatedAt = updatedVo.updatedAt;
+      } else {
+        currentNote.value.updatedAt = new Date().toISOString();
+      }
+      // 同步更新 noteList 中对应笔记的信息
+      const noteInList = noteList.value.find(n => n.id === updatedVo.id);
+      if (noteInList) {
+        Object.assign(noteInList, updatedVo);
+      }
     }
 
     alert('笔记内容保存成功！');
@@ -791,6 +804,9 @@ const fetchFileContentByUrl = async (url) => {
 };
 
 const selectNote = async (note) => {
+  // 如果切换回同一个笔记，需要强制重新获取内容
+  const isSameNote = currentNote.value && currentNote.value.id === note.id;
+  
   currentNote.value = note;
   currentTitle.value = note.title;
   currentNoteType.value = note.fileType;
@@ -810,20 +826,26 @@ const selectNote = async (note) => {
 
   try {
     // 2. 获取 MinIO 文件 URL
+    // 如果是同一个笔记，添加时间戳参数强制刷新缓存
     const fileUrl = await getFileUrl(fileName);
     if (!fileUrl) {
       throw new Error('Failed to get file URL.');
     }
 
+    // 如果是同一个笔记，添加时间戳参数强制刷新缓存
+    const urlWithCacheBuster = isSameNote 
+      ? `${fileUrl}${fileUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`
+      : fileUrl;
+
     if (note.fileType === 'pdf') {
       // 3. 处理 PDF 预览
       // PDF 只需要 URL。您需要将这个 URL 传递给您集成的 PDF 预览组件。
-      pdfPreviewUrl.value = fileUrl;
+      pdfPreviewUrl.value = urlWithCacheBuster;
       // 记得在模板中绑定这个 URL 到 PDF 预览组件
-      console.log(`PDF Preview URL: ${fileUrl}`);
+      console.log(`PDF Preview URL: ${urlWithCacheBuster}`);
     } else if (note.fileType === 'md' && editor.value) {
       // 4. 处理 Markdown 文件
-      const markdownContent = await fetchFileContentByUrl(fileUrl);
+      const markdownContent = await fetchFileContentByUrl(urlWithCacheBuster);
       const htmlContent = mdParser.render(markdownContent || '');
       editor.value.commands.setContent(htmlContent, false);
       nextTick(() => {
