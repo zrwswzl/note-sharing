@@ -54,7 +54,7 @@
           <span class="action-text">消息</span>
         </div>
 
-        <div class="user-avatar-block">
+        <div class="user-avatar-block" @click="goToProfile">
           <img 
             src="/assets/avatars/avatar.png" 
             alt="用户头像" 
@@ -372,6 +372,11 @@ const handleWorkspaceSelected = (workspaceId) => {
   }
 }
 
+// 跳转到个人信息页面
+const goToProfile = () => {
+  currentTab.value = 'profile'
+}
+
 // 组件挂载时，确保 URL 中有 tab 参数，并尝试恢复编辑器状态
 onMounted(async () => {
   if (!route.query.tab) {
@@ -622,6 +627,13 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   height: 48px;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.user-avatar-block:hover {
+  background-color: #f6f6f6;
 }
 
 .user-avatar-block .avatar-placeholder {
