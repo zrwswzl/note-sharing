@@ -359,9 +359,10 @@ const props = defineProps({
   spaceId: Number,
   notebookId: Number,
   notebookName: String,
-  notebookList: Array
+  notebookList: Array,
+  initialNoteId: Number  // 初始选中的笔记ID
 });
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'note-selected']);
 
 // ----------------- 状态管理 -----------------
 const showNoteMenuId = ref(null);
@@ -567,8 +568,16 @@ const fetchNotes = async (sortBy = 'updatedAt') => {
     const notes = await fetchNotesByNotebook(props.notebookId);
     noteList.value = notes;
 
-    // 默认选中第一个笔记或保持现有选中状态
-    if (!currentNote.value && noteList.value.length > 0) {
+    // 优先选中初始笔记ID，否则选中第一个笔记或保持现有选中状态
+    if (props.initialNoteId) {
+      const targetNote = noteList.value.find(n => n.id === props.initialNoteId);
+      if (targetNote) {
+        selectNote(targetNote);
+      } else if (noteList.value.length > 0) {
+        // 如果初始笔记ID不存在，选中第一个
+        selectNote(noteList.value[0]);
+      }
+    } else if (!currentNote.value && noteList.value.length > 0) {
       selectNote(noteList.value[0]);
     } else if (currentNote.value) {
       const updatedNote = noteList.value.find(n => n.id === currentNote.value.id);
@@ -786,6 +795,9 @@ const selectNote = async (note) => {
   currentTitle.value = note.title;
   currentNoteType.value = note.fileType;
   pdfPreviewUrl.value = null;
+  
+  // 通知父组件当前选中的笔记ID
+  emit('note-selected', note.id);
 
   // 1. 获取文件名 (假设 note 对象中包含文件名)
   const fileName = note.filename;

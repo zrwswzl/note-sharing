@@ -121,8 +121,11 @@ import { ref, onMounted, computed, watch } from "vue";
 import service from '../../api/request';
 import { useUserStore } from '@/stores/user';
 
-// --- 1. 必须显式定义 emit ---
-const emit = defineEmits(['openNotebook']);
+// --- 1. 必须显式定义 emit 和 props ---
+const props = defineProps({
+  initialWorkspaceId: Number  // 初始选中的笔记空间ID
+});
+const emit = defineEmits(['openNotebook', 'workspace-selected']);
 
 const userStore = useUserStore();
 
@@ -246,7 +249,16 @@ const fetchWorkspaces = async () => {
       await Promise.all(tasks);
       workspaceList.value = workspaces;
 
-      if (workspaceList.value.length > 0 && !selectedWorkspace.value) {
+      // 优先选中初始空间ID，否则选中第一个空间
+      if (props.initialWorkspaceId) {
+        const targetWorkspace = workspaceList.value.find(ws => ws.id === props.initialWorkspaceId);
+        if (targetWorkspace) {
+          selectWorkspace(targetWorkspace);
+        } else if (workspaceList.value.length > 0 && !selectedWorkspace.value) {
+          // 如果初始空间ID不存在，选中第一个
+          selectWorkspace(workspaceList.value[0]);
+        }
+      } else if (workspaceList.value.length > 0 && !selectedWorkspace.value) {
         selectWorkspace(workspaceList.value[0]);
       }
     } else {
@@ -299,6 +311,9 @@ function selectWorkspace(ws) {
   selectedNotebook.value = null;
   hideAllContextMenus();
   loadNotebooks(ws.id);
+  
+  // 通知父组件当前选中的空间ID
+  emit('workspace-selected', ws.id);
 }
 
 async function deleteWorkspace() {
