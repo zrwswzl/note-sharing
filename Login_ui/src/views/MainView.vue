@@ -55,7 +55,11 @@
         </div>
 
         <div class="user-avatar-block">
-          <span class="avatar-placeholder" role="img" aria-label="用户头像"></span>
+          <img 
+            src="/assets/avatars/avatar.png" 
+            alt="用户头像" 
+            class="user-avatar-img"
+          />
         </div>
       </div>
 
@@ -395,6 +399,15 @@ const handleCloseEditor = () => {
   height: 100%;
   border-radius: 50%;
   background-color: #e0e0e0;
+  border: none;
+}
+
+.user-avatar-block .user-avatar-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
   border: none;
 }
 

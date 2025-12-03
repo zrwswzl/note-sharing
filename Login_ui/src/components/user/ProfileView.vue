@@ -3,7 +3,11 @@
     <div class="profile-card">
       <header class="profile-header">
         <div class="avatar-shell" aria-hidden="true">
-          <span class="avatar-icon"></span>
+          <img 
+            src="/assets/avatars/avatar.png" 
+            alt="用户头像" 
+            class="avatar-img"
+          />
         </div>
         <div class="header-text">
           <p class="section-label">账户设置</p>
@@ -329,6 +333,13 @@ onMounted(() => {
   border: 2px solid var(--brand-primary, #22ee99);
   border-top: none;
   border-radius: 40% 40% 60% 60%;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 18px;
 }
 
 .header-text h2 {
