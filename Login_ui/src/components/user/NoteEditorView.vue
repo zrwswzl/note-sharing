@@ -359,9 +359,10 @@ const props = defineProps({
   spaceId: Number,
   notebookId: Number,
   notebookName: String,
-  notebookList: Array
+  notebookList: Array,
+  initialNoteId: Number  // 初始选中的笔记ID
 });
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'note-selected']);
 
 // ----------------- 状态管理 -----------------
 const showNoteMenuId = ref(null);
@@ -456,6 +457,11 @@ const debouncedUpdateNote = debounce(async (meta, file) => {
     // 更新本地的 updatedAt 状态，给用户反馈
     if (currentNote.value && currentNote.value.id === updatedVo.id) {
       currentNote.value.updatedAt = updatedVo.updatedAt;
+      // 同步更新 noteList 中对应笔记的信息
+      const noteInList = noteList.value.find(n => n.id === updatedVo.id);
+      if (noteInList) {
+        Object.assign(noteInList, updatedVo);
+      }
     }
 
     isLoading.value = false;
@@ -537,10 +543,18 @@ const saveNoteContent = async () => {
     // 【API调用点 B】: 手动保存笔记内容 (PUT /noting/notes/update)
     const updatedVo = await updateNote(meta, mdFile);
 
-    if (updatedVo && updatedVo.updatedAt) {
-      currentNote.value.updatedAt = updatedVo.updatedAt;
-    } else {
-      currentNote.value.updatedAt = new Date().toISOString();
+    if (updatedVo) {
+      // 更新 currentNote
+      if (updatedVo.updatedAt) {
+        currentNote.value.updatedAt = updatedVo.updatedAt;
+      } else {
+        currentNote.value.updatedAt = new Date().toISOString();
+      }
+      // 同步更新 noteList 中对应笔记的信息
+      const noteInList = noteList.value.find(n => n.id === updatedVo.id);
+      if (noteInList) {
+        Object.assign(noteInList, updatedVo);
+      }
     }
 
     alert('笔记内容保存成功！');
@@ -567,8 +581,16 @@ const fetchNotes = async (sortBy = 'updatedAt') => {
     const notes = await fetchNotesByNotebook(props.notebookId);
     noteList.value = notes;
 
-    // 默认选中第一个笔记或保持现有选中状态
-    if (!currentNote.value && noteList.value.length > 0) {
+    // 优先选中初始笔记ID，否则选中第一个笔记或保持现有选中状态
+    if (props.initialNoteId) {
+      const targetNote = noteList.value.find(n => n.id === props.initialNoteId);
+      if (targetNote) {
+        selectNote(targetNote);
+      } else if (noteList.value.length > 0) {
+        // 如果初始笔记ID不存在，选中第一个
+        selectNote(noteList.value[0]);
+      }
+    } else if (!currentNote.value && noteList.value.length > 0) {
       selectNote(noteList.value[0]);
     } else if (currentNote.value) {
       const updatedNote = noteList.value.find(n => n.id === currentNote.value.id);
@@ -782,10 +804,16 @@ const fetchFileContentByUrl = async (url) => {
 };
 
 const selectNote = async (note) => {
+  // 如果切换回同一个笔记，需要强制重新获取内容
+  const isSameNote = currentNote.value && currentNote.value.id === note.id;
+  
   currentNote.value = note;
   currentTitle.value = note.title;
   currentNoteType.value = note.fileType;
   pdfPreviewUrl.value = null;
+  
+  // 通知父组件当前选中的笔记ID
+  emit('note-selected', note.id);
 
   // 1. 获取文件名 (假设 note 对象中包含文件名)
   const fileName = note.filename;
@@ -798,20 +826,26 @@ const selectNote = async (note) => {
 
   try {
     // 2. 获取 MinIO 文件 URL
+    // 如果是同一个笔记，添加时间戳参数强制刷新缓存
     const fileUrl = await getFileUrl(fileName);
     if (!fileUrl) {
       throw new Error('Failed to get file URL.');
     }
 
+    // 如果是同一个笔记，添加时间戳参数强制刷新缓存
+    const urlWithCacheBuster = isSameNote 
+      ? `${fileUrl}${fileUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`
+      : fileUrl;
+
     if (note.fileType === 'pdf') {
       // 3. 处理 PDF 预览
       // PDF 只需要 URL。您需要将这个 URL 传递给您集成的 PDF 预览组件。
-      pdfPreviewUrl.value = fileUrl;
+      pdfPreviewUrl.value = urlWithCacheBuster;
       // 记得在模板中绑定这个 URL 到 PDF 预览组件
-      console.log(`PDF Preview URL: ${fileUrl}`);
+      console.log(`PDF Preview URL: ${urlWithCacheBuster}`);
     } else if (note.fileType === 'md' && editor.value) {
       // 4. 处理 Markdown 文件
-      const markdownContent = await fetchFileContentByUrl(fileUrl);
+      const markdownContent = await fetchFileContentByUrl(urlWithCacheBuster);
       const htmlContent = mdParser.render(markdownContent || '');
       editor.value.commands.setContent(htmlContent, false);
       nextTick(() => {
@@ -1492,13 +1526,17 @@ const toggleInsertMenu = () => showInsertMenu.value = !showInsertMenu.value;
   background: #4c7cff;
   color: white;
   display: flex;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
   cursor: pointer;
   font-size: 14px;
   transition: background-color 0.2s;
   writing-mode: horizontal-tb;
   text-orientation: mixed;
   direction: ltr;
+  white-space: nowrap;
+  min-width: fit-content;
 }
 
 .insert-pill-btn:hover {

@@ -54,8 +54,12 @@
           <span class="action-text">消息</span>
         </div>
 
-        <div class="user-avatar-block">
-          <span class="avatar-placeholder" role="img" aria-label="用户头像"></span>
+        <div class="user-avatar-block" @click="goToProfile">
+          <img 
+            src="/assets/avatars/avatar.png" 
+            alt="用户头像" 
+            class="user-avatar-img"
+          />
         </div>
       </div>
 
@@ -70,7 +74,9 @@
             :notebookId="editingNotebookId"
             :notebookName="editingNotebookName"
             :notebookList="editingNotebookList"
+            :initialNoteId="editingNoteId"
             @close="handleCloseEditor"
+            @note-selected="handleNoteSelected"
         />
       </section>
 
@@ -78,7 +84,11 @@
         <SearchView />
       </section>
       <section v-else-if="currentTab === 'workspace'">
-        <WorkspaceView @open-notebook="handleOpenNotebook" />
+        <WorkspaceView 
+          :initialWorkspaceId="selectedWorkspaceId"
+          @open-notebook="handleOpenNotebook"
+          @workspace-selected="handleWorkspaceSelected"
+        />
       </section>
       <section v-else-if="currentTab === 'favorites'">
         <FavoritesView />
@@ -94,7 +104,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import SearchView from '../components/user/SearchView.vue'
 import WorkspaceView from '../components/user/WorkspaceView.vue'
 import ProfileView from '../components/user/ProfileView.vue'
@@ -102,9 +112,13 @@ import FavoritesView from '../components/user/FavoritesView.vue'
 import CommentsView from '../components/user/CommentsView.vue'
 import NoteEditorView from '../components/user/NoteEditorView.vue'
 import { useRouter, useRoute } from 'vue-router'
+import service from '../api/request'
+import { useUserStore } from '@/stores/user'
 
-const router = useRouter() // 【新增】
+const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
+const BASE_PATH = "/noting"
 
 const tabs = [
   { value: 'follow', label: '关注', desc: 'Follow' },
@@ -114,7 +128,49 @@ const tabs = [
   { value: 'workspace', label: '我的笔记', desc: 'WorkspaceView' }
 ]
 
-const currentTab = ref('recommend')
+// 从 URL 查询参数中读取 tab，如果没有则使用默认值
+const getTabFromRoute = () => {
+  const tabFromQuery = route.query.tab
+  // 验证 tab 值是否有效
+  const validTabs = tabs.map(t => t.value)
+  if (tabFromQuery && validTabs.includes(tabFromQuery)) {
+    return tabFromQuery
+  }
+  return 'recommend' // 默认值
+}
+
+const currentTab = ref(getTabFromRoute())
+
+// 当 currentTab 改变时，同步更新 URL 查询参数
+watch(currentTab, (newTab) => {
+  if (route.query.tab !== newTab) {
+    router.replace({
+      path: route.path,
+      query: { ...route.query, tab: newTab }
+    })
+  }
+})
+
+// 监听路由变化，从 URL 中恢复 tab 状态（处理浏览器前进/后退）
+watch(() => route.query.tab, (newTab) => {
+  if (newTab && tabs.map(t => t.value).includes(newTab)) {
+    currentTab.value = newTab
+    // 当切换到 workspace tab 时，恢复选中的空间
+    if (newTab === 'workspace') {
+      restoreWorkspaceFromRoute()
+    }
+  }
+})
+
+// 监听 workspaceId 变化，从 URL 中恢复空间状态
+watch(() => route.query.workspaceId, (newWorkspaceId) => {
+  if (currentTab.value === 'workspace' && newWorkspaceId) {
+    const workspaceId = Number(newWorkspaceId)
+    if (!isNaN(workspaceId)) {
+      selectedWorkspaceId.value = workspaceId
+    }
+  }
+})
 
 // --- 新增状态和方法来管理编辑器视图 ---
 
@@ -123,35 +179,219 @@ const editingNotebookId = ref(null);
 const editingSpaceId = ref(null);
 const editingNotebookName = ref(null);
 const editingNotebookList = ref([]); // 使用数组类型
+const editingNoteId = ref(null); // 当前选中的笔记ID
+const selectedWorkspaceId = ref(null); // 当前选中的笔记空间ID（在workspace tab时）
 
-// 处理 WorkspaceView 发出的“打开笔记本”事件
+// 获取标签名称的辅助函数
+const getTagNameString = async (tag) => {
+  try {
+    if (tag === null || tag === undefined || tag === '') return null;
+    const maybeId = Number(tag);
+    if (!Number.isNaN(maybeId) && String(tag).trim() !== '') {
+      const tagResp = await service.post(`${BASE_PATH}/tags/name`, { tagId: maybeId });
+      if (tagResp?.data?.code === 200 && tagResp.data.data) {
+        return tagResp.data.data.tagName || String(tag);
+      }
+    }
+    return String(tag);
+  } catch (err) {
+    return String(tag);
+  }
+}
+
+// 从 URL 查询参数中恢复编辑器状态
+const restoreEditorFromRoute = async () => {
+  const notebookIdFromQuery = route.query.notebookId
+  const spaceIdFromQuery = route.query.spaceId
+  
+  if (notebookIdFromQuery && spaceIdFromQuery) {
+    const notebookId = Number(notebookIdFromQuery)
+    const spaceId = Number(spaceIdFromQuery)
+    
+    if (!isNaN(notebookId) && !isNaN(spaceId)) {
+      // 恢复编辑器状态
+      editingNotebookId.value = notebookId
+      editingSpaceId.value = spaceId
+      
+      // 设置 tab 为 workspace，确保显示正确的视图
+      currentTab.value = 'workspace'
+      
+      // 从 URL 获取 notebookName
+      editingNotebookName.value = route.query.notebookName || null
+      
+      // 从 URL 获取当前选中的笔记ID
+      const noteIdFromQuery = route.query.noteId
+      if (noteIdFromQuery) {
+        const noteId = Number(noteIdFromQuery)
+        if (!isNaN(noteId)) {
+          editingNoteId.value = noteId
+        }
+      }
+      
+      // 尝试获取 notebookList
+      try {
+        const userId = userStore.userInfo.id
+        if (userId) {
+          const response = await service.post(`${BASE_PATH}/notebooks/by-space`, {
+            spaceId,
+            userId
+          })
+          
+          if (response.data.code === 200 && Array.isArray(response.data.data)) {
+            const notebooks = response.data.data
+            // 处理标签名称
+            const tasks = notebooks.map(async (nb) => {
+              const tagId = nb.tagId ?? nb.tag;
+              if (!tagId && tagId !== 0) {
+                nb.tagName = null;
+                return;
+              }
+              nb.tagName = await getTagNameString(tagId);
+            });
+            await Promise.all(tasks);
+            editingNotebookList.value = notebooks
+          } else {
+            editingNotebookList.value = []
+          }
+        } else {
+          editingNotebookList.value = []
+        }
+      } catch (error) {
+        console.error('恢复笔记本列表失败:', error)
+        editingNotebookList.value = []
+      }
+    }
+  }
+}
+
+// 处理 WorkspaceView 发出的"打开笔记本"事件
 const handleOpenNotebook = (payload) => {
-  // 切换到编辑模式
-
   if (payload && typeof payload.notebookId !== 'undefined') {
     editingNotebookId.value = payload.notebookId;
-
-    // 【修改点】：存储所有传入参数
     editingSpaceId.value = payload.spaceId;
     editingNotebookName.value = payload.notebookName;
     editingNotebookList.value = payload.notebookList;
+    editingNoteId.value = null; // 打开新笔记本时，重置笔记ID
 
+    // 将编辑器状态保存到 URL
+    router.replace({
+      path: route.path,
+      query: {
+        ...route.query,
+        tab: 'workspace',
+        notebookId: payload.notebookId,
+        spaceId: payload.spaceId,
+        notebookName: payload.notebookName || undefined
+        // 注意：不包含 noteId，因为打开笔记本时还没有选中笔记
+      }
+    })
   } else {
-
     console.error("打开笔记本失败：事件载荷中缺少 notebookId 字段。");
     editingNotebookId.value = null;
     editingSpaceId.value = null;
     editingNotebookName.value = null;
     editingNotebookList.value = [];
+    editingNoteId.value = null;
   }
 }
 
-// 处理编辑器内“关闭”或“返回”操作
+// 处理 NoteEditorView 发出的"笔记选中"事件
+const handleNoteSelected = (noteId) => {
+  editingNoteId.value = noteId;
+  
+  // 将选中的笔记ID保存到 URL
+  router.replace({
+    path: route.path,
+    query: {
+      ...route.query,
+      noteId: noteId
+    }
+  })
+}
+
+// 处理编辑器内"关闭"或"返回"操作
 const handleCloseEditor = () => {
+  // 保存笔记所在的空间ID，用于回到 workspace tab 时选中
+  const spaceIdBeforeClose = editingSpaceId.value
+  
   editingNotebookId.value = null
+  editingSpaceId.value = null
+  editingNotebookName.value = null
+  editingNotebookList.value = []
+  editingNoteId.value = null
+  
+  // 清除 URL 中的编辑器相关参数
+  const newQuery = { ...route.query }
+  delete newQuery.notebookId
+  delete newQuery.spaceId
+  delete newQuery.notebookName
+  delete newQuery.noteId
+  
+  // 如果关闭编辑器后回到 workspace tab，使用笔记所在的空间ID
+  if (spaceIdBeforeClose && currentTab.value === 'workspace') {
+    selectedWorkspaceId.value = spaceIdBeforeClose
+    newQuery.workspaceId = spaceIdBeforeClose
+  }
+  
+  router.replace({
+    path: route.path,
+    query: newQuery
+  })
+  
   // 确保当前 tab 切换回 workspace 视图，以便用户返回时看到列表
   currentTab.value = 'workspace';
 }
+
+// 从 URL 恢复 workspace tab 的选中空间
+const restoreWorkspaceFromRoute = () => {
+  // 只有在 workspace tab 时才恢复空间ID
+  if (currentTab.value === 'workspace') {
+    const workspaceIdFromQuery = route.query.workspaceId
+    if (workspaceIdFromQuery) {
+      const workspaceId = Number(workspaceIdFromQuery)
+      if (!isNaN(workspaceId)) {
+        selectedWorkspaceId.value = workspaceId
+      }
+    }
+  }
+}
+
+// 处理 WorkspaceView 发出的"空间选中"事件
+const handleWorkspaceSelected = (workspaceId) => {
+  selectedWorkspaceId.value = workspaceId
+  
+  // 将选中的空间ID保存到 URL（只在 workspace tab 时）
+  if (currentTab.value === 'workspace') {
+    router.replace({
+      path: route.path,
+      query: {
+        ...route.query,
+        workspaceId: workspaceId
+      }
+    })
+  }
+}
+
+// 跳转到个人信息页面
+const goToProfile = () => {
+  currentTab.value = 'profile'
+}
+
+// 组件挂载时，确保 URL 中有 tab 参数，并尝试恢复编辑器状态
+onMounted(async () => {
+  if (!route.query.tab) {
+    router.replace({
+      path: route.path,
+      query: { ...route.query, tab: currentTab.value }
+    })
+  }
+  
+  // 恢复 workspace tab 的选中空间
+  restoreWorkspaceFromRoute()
+  
+  // 尝试从 URL 恢复编辑器状态
+  await restoreEditorFromRoute()
+})
 
 // --- 结束新增 ---
 </script>
@@ -387,6 +627,13 @@ const handleCloseEditor = () => {
   align-items: center;
   justify-content: center;
   height: 48px;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.user-avatar-block:hover {
+  background-color: #f6f6f6;
 }
 
 .user-avatar-block .avatar-placeholder {
@@ -395,6 +642,15 @@ const handleCloseEditor = () => {
   height: 100%;
   border-radius: 50%;
   background-color: #e0e0e0;
+  border: none;
+}
+
+.user-avatar-block .user-avatar-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
   border: none;
 }
 
