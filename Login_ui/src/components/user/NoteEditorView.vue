@@ -1496,6 +1496,9 @@ const toggleInsertMenu = () => showInsertMenu.value = !showInsertMenu.value;
   cursor: pointer;
   font-size: 14px;
   transition: background-color 0.2s;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  direction: ltr;
 }
 
 .insert-pill-btn:hover {
@@ -1518,6 +1521,12 @@ const toggleInsertMenu = () => showInsertMenu.value = !showInsertMenu.value;
   left: 50%;
   transform: translateX(-50%);
   min-width: 120px;
+}
+
+.insert-menu .menu-item {
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  direction: ltr;
 }
 
 .insert-menu .emoji {
