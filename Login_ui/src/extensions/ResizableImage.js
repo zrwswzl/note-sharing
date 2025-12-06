@@ -6,14 +6,19 @@ export const ResizableImage = Image.extend({
       ...this.parent?.(),
       width: {
         default: null,
-        parseHTML: element => element.getAttribute('width'),
+        parseHTML: element => {
+          const width = element.getAttribute('width')
+          // 解析数字值（去除 px 等单位）
+          return width ? parseInt(width, 10) : null
+        },
         renderHTML: attributes => {
           if (!attributes.width) {
             return {}
           }
+          // HTML 属性应该是纯数字，不带单位
           const width = typeof attributes.width === 'number' 
-            ? `${attributes.width}px` 
-            : attributes.width
+            ? attributes.width 
+            : parseInt(attributes.width, 10)
           return {
             width: width,
           }
@@ -21,14 +26,19 @@ export const ResizableImage = Image.extend({
       },
       height: {
         default: null,
-        parseHTML: element => element.getAttribute('height'),
+        parseHTML: element => {
+          const height = element.getAttribute('height')
+          // 解析数字值（去除 px 等单位）
+          return height ? parseInt(height, 10) : null
+        },
         renderHTML: attributes => {
           if (!attributes.height) {
             return {}
           }
+          // HTML 属性应该是纯数字，不带单位
           const height = typeof attributes.height === 'number' 
-            ? `${attributes.height}px` 
-            : attributes.height
+            ? attributes.height 
+            : parseInt(attributes.height, 10)
           return {
             height: height,
           }
@@ -112,21 +122,7 @@ export const ResizableImage = Image.extend({
       let startHeight = 0
       let originalAspectRatio = null
 
-      const startResize = (e) => {
-        isResizing = true
-        startX = e.clientX
-        startY = e.clientY
-        const rect = img.getBoundingClientRect()
-        startWidth = rect.width
-        startHeight = rect.height
-        originalAspectRatio = startWidth / startHeight
-        e.preventDefault()
-        e.stopPropagation()
-        resizeHandle.style.opacity = '1'
-        document.body.style.cursor = 'nwse-resize'
-        document.body.style.userSelect = 'none'
-      }
-
+      // 使用闭包存储事件处理函数，以便后续移除
       const doResize = (e) => {
         if (!isResizing) return
         
@@ -152,6 +148,10 @@ export const ResizableImage = Image.extend({
         if (!isResizing) return
         isResizing = false
         
+        // 移除全局事件监听器
+        document.removeEventListener('mousemove', doResize)
+        document.removeEventListener('mouseup', stopResize)
+        
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
         
@@ -173,9 +173,26 @@ export const ResizableImage = Image.extend({
         }, 100)
       }
 
+      const startResize = (e) => {
+        isResizing = true
+        startX = e.clientX
+        startY = e.clientY
+        const rect = img.getBoundingClientRect()
+        startWidth = rect.width
+        startHeight = rect.height
+        originalAspectRatio = startWidth / startHeight
+        e.preventDefault()
+        e.stopPropagation()
+        resizeHandle.style.opacity = '1'
+        document.body.style.cursor = 'nwse-resize'
+        document.body.style.userSelect = 'none'
+        
+        // 只在开始调整大小时注册全局事件监听器
+        document.addEventListener('mousemove', doResize)
+        document.addEventListener('mouseup', stopResize)
+      }
+
       resizeHandle.addEventListener('mousedown', startResize)
-      document.addEventListener('mousemove', doResize)
-      document.addEventListener('mouseup', stopResize)
 
       return {
         dom: wrapper,
@@ -184,8 +201,13 @@ export const ResizableImage = Image.extend({
           wrapper.removeEventListener('mouseenter', handleMouseEnter)
           wrapper.removeEventListener('mouseleave', handleMouseLeave)
           resizeHandle.removeEventListener('mousedown', startResize)
-          document.removeEventListener('mousemove', doResize)
-          document.removeEventListener('mouseup', stopResize)
+          // 清理全局事件监听器（如果还在调整大小）
+          if (isResizing) {
+            document.removeEventListener('mousemove', doResize)
+            document.removeEventListener('mouseup', stopResize)
+            document.body.style.cursor = ''
+            document.body.style.userSelect = ''
+          }
         },
       }
     }

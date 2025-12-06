@@ -403,18 +403,20 @@ turndownService.addRule('keepImages', {
     const src = node.getAttribute('src') || '';
     const width = node.getAttribute('width');
     const height = node.getAttribute('height');
-    const title = node.title ? ` "${node.title}"` : '';
+    const title = node.title || '';
     
     // 如果有尺寸信息，使用 HTML 格式保留
     if (width || height) {
       let htmlAttrs = '';
       if (width) htmlAttrs += ` width="${width}"`;
       if (height) htmlAttrs += ` height="${height}"`;
-      return `<img src="${src}" alt="${alt}"${htmlAttrs}${title}>`;
+      if (title) htmlAttrs += ` title="${title}"`;
+      return `<img src="${src}" alt="${alt}"${htmlAttrs}>`;
     }
     
     // 否则使用标准 Markdown 格式
-    return `![${alt}](${src}${title})`;
+    const titlePart = title ? ` "${title}"` : '';
+    return `![${alt}](${src}${titlePart})`;
   }
 });
 
