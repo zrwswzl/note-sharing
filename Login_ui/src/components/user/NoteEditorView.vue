@@ -1526,13 +1526,17 @@ const toggleInsertMenu = () => showInsertMenu.value = !showInsertMenu.value;
   background: #4c7cff;
   color: white;
   display: flex;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
   cursor: pointer;
   font-size: 14px;
   transition: background-color 0.2s;
   writing-mode: horizontal-tb;
   text-orientation: mixed;
   direction: ltr;
+  white-space: nowrap;
+  min-width: fit-content;
 }
 
 .insert-pill-btn:hover {
