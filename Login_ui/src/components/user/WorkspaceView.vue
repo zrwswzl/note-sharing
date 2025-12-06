@@ -458,9 +458,10 @@ function openRenameWorkspace() {
   };
 }
 
-function openRenameNotebook() {
+async function openRenameNotebook() {
   hideAllContextMenus();
   const target = selectedNotebook.value;
+  const tag_named = await getTagNameString(target.tagId)
   if (!target) return;
   dialog.value = {
     visible: true,
@@ -468,7 +469,7 @@ function openRenameNotebook() {
     type: "rename-notebook",
     form: {
       name: target.name,
-      tag: target.tagId ?? target.tag ?? '',
+      tag: tag_named ?? target.tag ?? '',
       targetNoteSpaceId: null
     }
   };
