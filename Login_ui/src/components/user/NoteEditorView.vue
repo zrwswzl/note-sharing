@@ -333,12 +333,12 @@ import Underline from '@tiptap/extension-underline';
 import TaskList from '@tiptap/extension-task-list';
 import { TaskItem } from '@tiptap/extension-task-item';
 import Highlight from '@tiptap/extension-highlight';
-import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import TurndownService from 'turndown';
 import { debounce } from 'lodash-es';
 import VuePdfEmbed from 'vue-pdf-embed'
 import MarkdownIt from 'markdown-it';
+import { ResizableImage } from '@/extensions/ResizableImage';
 
 
 // 引入真实的 API 接口
@@ -395,14 +395,25 @@ const turndownService = new TurndownService({
   codeBlockStyle: 'fenced'
 });
 
-// 确保 Turndown 保留图片
+// 确保 Turndown 保留图片（包括尺寸信息）
 turndownService.addRule('keepImages', {
   filter: ['img'],
   replacement: function (content, node) {
     const alt = node.alt || '';
     const src = node.getAttribute('src') || '';
+    const width = node.getAttribute('width');
+    const height = node.getAttribute('height');
     const title = node.title ? ` "${node.title}"` : '';
-    // 转换为 Markdown 图片语法
+    
+    // 如果有尺寸信息，使用 HTML 格式保留
+    if (width || height) {
+      let htmlAttrs = '';
+      if (width) htmlAttrs += ` width="${width}"`;
+      if (height) htmlAttrs += ` height="${height}"`;
+      return `<img src="${src}" alt="${alt}"${htmlAttrs}${title}>`;
+    }
+    
+    // 否则使用标准 Markdown 格式
     return `![${alt}](${src}${title})`;
   }
 });
@@ -478,13 +489,53 @@ const editor = useEditor({
   extensions: [
     StarterKit, Underline, TaskList,
     TaskItem.configure({ nested: true }), Highlight.configure({ multicolor: true }),
-    Image.configure({ inline: true, allowBase64: true }),
+    ResizableImage.configure({ 
+      inline: true, 
+      allowBase64: true,
+      HTMLAttributes: {
+        class: 'resizable-image',
+      },
+    }),
     Placeholder.configure({ placeholder: '输入内容，输入 / 唤起菜单...' }),
   ],
   editorProps: {
     attributes: {
       // 移除原有的 prose 类，使用自定义样式
       class: 'prose-container focus:outline-none',
+    },
+    handlePaste: (view, event, slice) => {
+      // 处理粘贴事件
+      const items = Array.from(event.clipboardData?.items || [])
+      const imageItem = items.find(item => {
+        const type = item.type || ''
+        return type.indexOf('image') !== -1
+      })
+      
+      if (imageItem) {
+        event.preventDefault()
+        event.stopPropagation()
+        
+        const file = imageItem.getAsFile()
+        if (file && file.size > 0) {
+          // 确保编辑器存在且当前笔记类型正确
+          if (currentNoteType.value !== 'md') {
+            alert('请先选择一个富文本笔记进行编辑。')
+            return true
+          }
+          
+          // 异步处理图片上传和插入
+          handlePastedImage(file).catch(error => {
+            console.error('粘贴图片失败:', error)
+            alert('图片粘贴失败：' + (error.message || '请稍后重试'))
+          })
+          
+          return true // 阻止默认粘贴行为
+        } else {
+          console.warn('粘贴的图片文件无效或为空')
+        }
+      }
+      
+      return false // 允许其他内容正常粘贴
     },
   },
   onUpdate: ({ editor }) => {
@@ -1093,20 +1144,137 @@ const handleImageUpload = async (e) => {
   const file = e.target.files[0];
   if (!file || !editor.value) return;
 
+  await insertImage(file);
+  
+  // 清空 input，防止无法连续上传同一张图
+  e.target.value = null;
+};
+
+// 处理粘贴的图片
+const handlePastedImage = async (file) => {
+  if (!file) {
+    console.warn('粘贴的文件无效')
+    return;
+  }
+  
+  if (!editor.value) {
+    console.warn('编辑器未初始化')
+    alert('编辑器未准备好，请稍后再试')
+    return;
+  }
+  
+  console.log('开始处理粘贴的图片，文件大小:', file.size, '文件类型:', file.type)
+  await insertImage(file);
+};
+
+// 统一的图片插入函数
+const insertImage = async (file) => {
+  if (!editor.value) {
+    console.warn('编辑器未初始化')
+    return;
+  }
+
   try {
+    console.log('开始上传图片...')
     // 【API调用点 J】: 上传图片并获取 URL (POST /noting/notes/image)
     const imageUrl = await uploadImage(file);
+    console.log('图片上传成功，URL:', imageUrl)
 
-    // 将返回的 URL 插入到编辑器中
-    if (imageUrl) {
-      editor.value.chain().focus().setImage({ src: imageUrl }).run();
+    if (!imageUrl) {
+      throw new Error('图片上传失败，未返回 URL')
     }
+
+    // 获取图片的原始尺寸（使用 Promise 包装）
+    const getImageDimensions = (url) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous'; // 允许跨域加载
+        let resolved = false;
+        
+        img.onload = () => {
+          if (!resolved) {
+            resolved = true;
+            console.log('图片尺寸获取成功:', img.naturalWidth, 'x', img.naturalHeight)
+            resolve({
+              width: img.naturalWidth,
+              height: img.naturalHeight
+            });
+          }
+        };
+        img.onerror = () => {
+          if (!resolved) {
+            resolved = true;
+            // 如果无法加载图片尺寸，返回 null（不阻塞插入）
+            console.warn('无法获取图片尺寸，将使用默认尺寸');
+            resolve(null);
+          }
+        };
+        // 设置超时，避免长时间等待
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            console.warn('获取图片尺寸超时');
+            resolve(null);
+          }
+        }, 3000);
+        img.src = url;
+      });
+    };
+
+    // 等待图片尺寸加载完成（最多等待3秒）
+    const dimensions = await getImageDimensions(imageUrl);
+    
+    // 插入图片，设置合理的默认尺寸
+    const imageAttrs = { src: imageUrl };
+    
+    // 设置最大显示宽度（可以根据需要调整）
+    const MAX_DISPLAY_WIDTH = 800; // 最大显示宽度 800px
+    const MAX_DISPLAY_HEIGHT = 600; // 最大显示高度 600px
+    
+    if (dimensions && dimensions.width && dimensions.height) {
+      // 计算缩放后的尺寸，保持宽高比
+      let displayWidth = dimensions.width;
+      let displayHeight = dimensions.height;
+      
+      // 如果宽度超过最大宽度，按比例缩放
+      if (displayWidth > MAX_DISPLAY_WIDTH) {
+        const ratio = MAX_DISPLAY_WIDTH / displayWidth;
+        displayWidth = MAX_DISPLAY_WIDTH;
+        displayHeight = Math.round(displayHeight * ratio);
+      }
+      
+      // 如果高度仍然超过最大高度，再次按比例缩放
+      if (displayHeight > MAX_DISPLAY_HEIGHT) {
+        const ratio = MAX_DISPLAY_HEIGHT / displayHeight;
+        displayHeight = MAX_DISPLAY_HEIGHT;
+        displayWidth = Math.round(displayWidth * ratio);
+      }
+      
+      imageAttrs.width = displayWidth;
+      imageAttrs.height = displayHeight;
+      
+      console.log(`图片尺寸: 原始 ${dimensions.width}x${dimensions.height}, 显示 ${displayWidth}x${displayHeight}`)
+    } else {
+      // 如果无法获取尺寸，使用默认尺寸
+      imageAttrs.width = MAX_DISPLAY_WIDTH;
+      imageAttrs.height = MAX_DISPLAY_HEIGHT;
+      console.log('使用默认图片尺寸:', MAX_DISPLAY_WIDTH, 'x', MAX_DISPLAY_HEIGHT)
+    }
+    
+    console.log('准备插入图片，属性:', imageAttrs)
+    // 插入图片到编辑器
+    editor.value.chain().focus().setImage(imageAttrs).run();
+    
+    // 验证图片是否插入成功
+    const htmlContent = editor.value.getHTML();
+    const hasImage = htmlContent.includes(imageUrl);
+    console.log('图片插入成功，HTML 中包含图片:', hasImage)
+    console.log('当前编辑器 HTML 内容:', htmlContent.substring(0, 500))
+      
   } catch (error) {
-    alert('图片上传失败，请稍后重试。');
     console.error('Error uploading image:', error);
-  }finally {
-    // 清空 input，防止无法连续上传同一张图
-    e.target.value = null;
+    alert('图片上传失败：' + (error.message || '请稍后重试'));
+    throw error; // 重新抛出错误以便调用者处理
   }
 };
 
@@ -1680,6 +1848,41 @@ const toggleInsertMenu = () => showInsertMenu.value = !showInsertMenu.value;
   display: block;
   margin: 10px auto; /* 图片居中 */
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* 图片包装器样式 */
+:deep(.image-wrapper) {
+  display: inline-block;
+  position: relative;
+  max-width: 100%;
+  margin: 10px auto;
+  text-align: center;
+}
+
+:deep(.image-wrapper:hover .image-resize-handle) {
+  opacity: 1;
+}
+
+/* 调整大小控制点样式 */
+:deep(.image-resize-handle) {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  background: #4c7cff;
+  border: 2px solid white;
+  border-radius: 50%;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+:deep(.image-resize-handle:hover) {
+  background: #3a68e0;
+  transform: scale(1.2);
 }
 
 /* --- PDF 预览样式 --- */
