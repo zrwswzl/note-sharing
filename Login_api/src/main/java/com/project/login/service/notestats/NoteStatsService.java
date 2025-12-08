@@ -29,6 +29,9 @@ public class NoteStatsService {
     private static final String REDIS_KEY_PREFIX = "note_stats:";
     private static final String MQ_QUEUE = "note.redis.queue";
 
+    private static final Set<String> ALLOWED_FIELDS =
+            Set.of("views", "likes", "favorites", "comments");
+
     /**
      * 高频写入（写 Redis 总量）。若 Redis 无数据则从 DB 读并回写（包含 version）。
      */
@@ -38,50 +41,72 @@ public class NoteStatsService {
             return emptyStats(noteId);
         }
 
+        if (!ALLOWED_FIELDS.contains(field)) {
+            log.warn("Invalid field={} for noteId={}, skip", field, noteId);
+            return getStats(noteId);
+        }
+
         String key = REDIS_KEY_PREFIX + noteId;
         HashOperations<String, Object, Object> ops = redisTemplate.opsForHash();
 
-        // 如果 Redis 无数据，则初始化：从 DB 读取并回写（或在 DB 中插入空行）
-        if (!redisTemplate.hasKey(key) || ops.size(key) == 0) {
-            NoteStatsDO db = noteStatsMapper.getById(noteId);
-            if (db == null) {
-                // 如果 DB 没有，插入初始行（version = 0）
-                NoteStatsDO init = new NoteStatsDO();
-                init.setNoteId(noteId);
-                init.setViews(0L);
-                init.setLikes(0L);
-                init.setFavorites(0L);
-                init.setComments(0L);
-                init.setLastActivityAt(LocalDateTime.now());
-                init.setVersion(0L);
-                noteStatsMapper.insert(init);
-                db = noteStatsMapper.getById(noteId);
-            }
-            // 回写 Redis（将 DB 总量写进 Redis，并写入 base version）
-            ops.put(key, "views", db.getViews());
-            ops.put(key, "likes", db.getLikes());
-            ops.put(key, "favorites", db.getFavorites());
-            ops.put(key, "comments", db.getComments());
-            ops.put(key, "last_activity_at", db.getLastActivityAt().toString());
-            ops.put(key, "version", String.valueOf(db.getVersion()));
-            redisTemplate.expire(key, 7, TimeUnit.DAYS);
-        }
+        // === Redis 初始化 ===
+        initRedisIfNeeded(noteId, ops, key);
 
-        // 原子增量
+        // === 原子增量 ===
         ops.increment(key, field, delta);
         ops.put(key, "last_activity_at", LocalDateTime.now().toString());
 
-        // 返回当前值（从 Redis 读）
+        // 返回当前值
         Map<Object, Object> map = ops.entries(key);
         return toVO(noteId, map);
     }
 
     /**
-     * 获取 Redis 中总量；若 Redis 没有则从 DB 读并回写 Redis
+     * 如果 Redis 中没有数据，则从 DB 初始化回写 Redis
+     */
+    private void initRedisIfNeeded(Long noteId, HashOperations<String, Object, Object> ops, String key) {
+        if (redisTemplate.hasKey(key) && ops.size(key) > 0) {
+            return;
+        }
+
+        NoteStatsDO db = noteStatsMapper.getById(noteId);
+        if (db == null) {
+            // DB 初始化（version=0）
+            db = NoteStatsDO.builder()
+                    .noteId(noteId)
+                    .authorName("")
+                    .views(0L)
+                    .likes(0L)
+                    .favorites(0L)
+                    .comments(0L)
+                    .lastActivityAt(LocalDateTime.now())
+                    .version(0L)
+                    .build();
+            noteStatsMapper.insert(db);
+        }
+
+        writeStatsToRedis(key, ops, db);
+    }
+
+    /**
+     * 写入 Redis
+     */
+    private void writeStatsToRedis(String key, HashOperations<String, Object, Object> ops, NoteStatsDO db) {
+        ops.put(key, "authorName", db.getAuthorName());
+        ops.put(key, "views", db.getViews());
+        ops.put(key, "likes", db.getLikes());
+        ops.put(key, "favorites", db.getFavorites());
+        ops.put(key, "comments", db.getComments());
+        ops.put(key, "last_activity_at", db.getLastActivityAt().toString());
+        ops.put(key, "version", db.getVersion());
+        redisTemplate.expire(key, 7, TimeUnit.DAYS);
+    }
+
+    /**
+     * 获取 Redis 状态
      */
     public NoteStatsVO getStats(Long noteId) {
         if (noteId == null || noteId < 1) {
-            log.warn("Invalid noteId={}, return emptyStats", noteId);
             return emptyStats(noteId);
         }
 
@@ -92,14 +117,8 @@ public class NoteStatsService {
         if (map.isEmpty()) {
             NoteStatsDO db = noteStatsMapper.getById(noteId);
             if (db == null) return emptyStats(noteId);
-            // 回写 Redis
-            ops.put(key, "views", db.getViews());
-            ops.put(key, "likes", db.getLikes());
-            ops.put(key, "favorites", db.getFavorites());
-            ops.put(key, "comments", db.getComments());
-            ops.put(key, "last_activity_at", db.getLastActivityAt().toString());
-            ops.put(key, "version", String.valueOf(db.getVersion()));
-            redisTemplate.expire(key, 7, TimeUnit.DAYS);
+
+            writeStatsToRedis(key, ops, db);
             map = ops.entries(key);
         }
 
@@ -109,6 +128,7 @@ public class NoteStatsService {
     private NoteStatsVO toVO(Long noteId, Map<Object, Object> map) {
         NoteStatsVO vo = new NoteStatsVO();
         vo.setNoteId(noteId);
+        vo.setAuthorName(Objects.toString(map.get("authorName"), ""));
         vo.setViews(parseLong(map.get("views")));
         vo.setLikes(parseLong(map.get("likes")));
         vo.setFavorites(parseLong(map.get("favorites")));
@@ -117,7 +137,6 @@ public class NoteStatsService {
     }
 
     private long parseLong(Object o) {
-        if (o == null) return 0L;
         if (o instanceof Number) return ((Number) o).longValue();
         try { return Long.parseLong(o.toString()); } catch (Exception ex) { return 0L; }
     }
@@ -125,6 +144,7 @@ public class NoteStatsService {
     private NoteStatsVO emptyStats(Long noteId) {
         NoteStatsVO vo = new NoteStatsVO();
         vo.setNoteId(noteId);
+        vo.setAuthorName("");
         vo.setViews(0L);
         vo.setLikes(0L);
         vo.setFavorites(0L);
@@ -133,60 +153,56 @@ public class NoteStatsService {
     }
 
     /**
-     * 批量 flush Redis -> MQ（推送每个 key 的总量 + base version）
+     * Flush Redis → MQ
      */
     public void flushToMQ() {
         Set<String> keys = redisTemplate.keys(REDIS_KEY_PREFIX + "*");
-        if (keys.isEmpty()) return;
+        if (keys == null || keys.isEmpty()) return;
 
-        keys.forEach(key -> {
+        for (String key : keys) {
             try {
                 Long noteId = Long.parseLong(key.substring(REDIS_KEY_PREFIX.length()));
                 if (noteId < 1) {
-                    log.warn("Invalid noteId={}, skip flushToMQ", noteId);
-                    return;
+                    continue;
                 }
 
                 Map<Object, Object> map = redisTemplate.opsForHash().entries(key);
-                if (map.isEmpty()) return;
+                if (map.isEmpty()) continue;
 
                 Map<String, Object> msg = new HashMap<>();
                 msg.put("note_id", noteId);
+                msg.put("authorName", map.getOrDefault("authorName", ""));
                 msg.put("views", parseLong(map.get("views")));
                 msg.put("likes", parseLong(map.get("likes")));
                 msg.put("favorites", parseLong(map.get("favorites")));
                 msg.put("comments", parseLong(map.get("comments")));
-                msg.put("last_activity_at", map.getOrDefault("last_activity_at", LocalDateTime.now().toString()).toString());
-                msg.put("version", map.getOrDefault("version", "0").toString());
+                msg.put("last_activity_at", map.getOrDefault("last_activity_at",
+                        LocalDateTime.now().toString()));
+                msg.put("version", map.getOrDefault("version", 0L));
 
                 rabbitTemplate.convertAndSend(MQ_QUEUE, msg);
-                log.debug("Flushed note stats to MQ: noteId={} msg={}", noteId, msg);
-            } catch (Exception e) {
-                log.error("flushToMQ error for key {}", key, e);
+
+            } catch (Exception ex) {
+                log.error("flushToMQ error for key={}", key, ex);
             }
-        });
+        }
     }
 
     /**
-     * 启动时异步预热：从 DB 读 top-n 最近更新的数据写回 Redis
+     * 异步预热
      */
     @Async
     public void preloadRecent(int n) {
         List<NoteStatsDO> list = noteStatsMapper.getRecentUpdated(n);
-        Random rnd = new Random();
-        for (NoteStatsDO item : list) {
-            if (item.getNoteId() < 1) continue; // 安全兜底
+        HashOperations<String, Object, Object> ops = redisTemplate.opsForHash();
 
-            try { Thread.sleep(rnd.nextInt(100)); } catch (InterruptedException ignored) {}
+        for (NoteStatsDO item : list) {
+            if (item.getNoteId() < 1) continue;
+
             String key = REDIS_KEY_PREFIX + item.getNoteId();
-            HashOperations<String, Object, Object> ops = redisTemplate.opsForHash();
-            ops.put(key, "views", item.getViews());
-            ops.put(key, "likes", item.getLikes());
-            ops.put(key, "favorites", item.getFavorites());
-            ops.put(key, "comments", item.getComments());
-            ops.put(key, "last_activity_at", item.getLastActivityAt().toString());
-            ops.put(key, "version", String.valueOf(item.getVersion()));
-            redisTemplate.expire(key, 7, TimeUnit.DAYS);
+            writeStatsToRedis(key, ops, item);
+
+            try { Thread.sleep(30); } catch (Exception ignored) {}
         }
     }
 }

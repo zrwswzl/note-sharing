@@ -12,6 +12,10 @@ public interface UserMapper {
             "FROM users WHERE id = #{id}")
     UserDO selectById(@Param("id") Long id);
 
+    @Select("SELECT username " +
+            "FROM users WHERE id = #{id}")
+    String selectNameById(Long id);
+
     @Select("SELECT id, username, password_hash AS passwordHash, enabled, studentNumber, email, " +
             "created_at AS createdAt, updated_at AS updatedAt " +
             "FROM users WHERE email = #{email}")

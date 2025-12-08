@@ -21,11 +21,11 @@ public class NoteStatsController {
     @Operation(summary = "Increment/Decrement a note statistic field")
     @PostMapping("/change")
     public StandardResponse<NoteStatsVO> change(
-            @Valid @RequestBody NoteStatsDTO dto,
+            @Valid @RequestParam Long noteId,
             @RequestParam String field,
             @RequestParam(defaultValue = "1") long delta) {
 
-        NoteStatsVO vo = noteStatsService.changeField(dto.getNoteId(), field, delta);
+        NoteStatsVO vo = noteStatsService.changeField(noteId, field, delta);
         return StandardResponse.success(vo);
     }
 

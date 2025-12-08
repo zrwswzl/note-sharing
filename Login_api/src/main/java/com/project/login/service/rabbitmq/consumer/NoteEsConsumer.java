@@ -9,6 +9,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitHandler;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Component
@@ -48,6 +49,7 @@ public class NoteEsConsumer {
         if (event.getTitle() != null) entity.setTitle(event.getTitle());
         if (event.getContentSummary() != null) entity.setContentSummary(event.getContentSummary());
 
+        event.setUpdatedAt(LocalDateTime.now());
         return entity;
     }
 
