@@ -38,7 +38,7 @@ public interface RemarkConvert {
             @Mapping(source = "isReceive", target = "isReceive"), // 映射 isReceive
             @Mapping(source = "likes", target = "likeCount"), // 映射 likes 到 likeCount
             @Mapping(target = "username",ignore = true),
-            @Mapping(target = "replyToUsername", ignore=true), // 使用 getReplyToUsername 方法填充 replyToUsername
+            @Mapping(source = "replyToUsername",target ="replyToUsername"), // 使用 getReplyToUsername 方法填充 replyToUsername
             @Mapping(target = "replies", ignore = true), // 暂时不处理子评论
             @Mapping(target = "LikedOrNot", ignore = true) // 当前用户是否已点赞，可能需要额外计算或通过其它查询填充
     })

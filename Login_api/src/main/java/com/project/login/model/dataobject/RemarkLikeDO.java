@@ -23,11 +23,9 @@ public class RemarkLikeDO {
     private String _id; // MongoDB 自动生成唯一 _id
 
     @Field("remark_id")
-    @Indexed // 为了快速查询某条评论的点赞数
     private String remarkId; // 评论 ID
 
     @Field("user_id")
-    @Indexed(unique = true) // (remarkId, userId) 组合唯一可通过复合索引实现
     private Long userId;   // 点赞用户 ID
 
     @Field("created_at")

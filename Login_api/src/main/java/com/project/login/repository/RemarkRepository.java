@@ -15,8 +15,6 @@ public interface RemarkRepository extends MongoRepository<RemarkDO,String> {
 
     @Query("{'parentId': ?0, 'isReceive': true}")
     List<RemarkDO> findRemarksByParentIdAndIsReceiveTrue(String parentId);
-
-    Optional<RemarkDO> findBy_id(String id);
     List<RemarkDO> findByUserId(Long userId);
 
 

@@ -44,7 +44,8 @@ public class RemarkDO {
     @Field("receive_to_remark_id") // 映射为 receive_to_remark_id
     private String receiveToRemarkId; // 回复哪条评论
 
-    @Field("likes") // 映射为 likes
-    private Long likes; // 点赞数
+    @Field("reply_to_user_name")
+    private String replyToUsername;
+
 
 }

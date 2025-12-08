@@ -17,6 +17,8 @@ public class RemarkInsertDTO {
 
     private Long userId; // 评论用户
 
+    private String replyToUsername;
+
     private String content; // 评论内容
 
     private String parentId; // 父评论（楼中楼）
