@@ -38,6 +38,13 @@ public class NoteService {
     private final NoteConvert convert;
     private final TagMapper tagMapper;
 
+    private String getAuthorName(Long id) {
+        Long bookId = noteMapper.selectNotebookIdByNoteId(id);
+        Long spaceId = notebookMapper.selectSpaceIdByNotebookId(bookId);
+        Long userId = notespaceMapper.selectUserIdBySpaceId(spaceId);
+        return userMapper.selectNameById(userId);
+    }
+
 
     @Transactional
     public NoteVO createNote(NoteCreateDTO dto) {
@@ -67,6 +74,7 @@ public class NoteService {
 
         NoteStatsDO stats = NoteStatsDO.builder()
                 .noteId(note.getId())
+                .authorName(getAuthorName(note.getId()))
                 .views(0L)
                 .likes(0L)
                 .favorites(0L)
@@ -205,6 +213,7 @@ public class NoteService {
         // --- 初始化 note_stats ---
         NoteStatsDO stats = NoteStatsDO.builder()
                 .noteId(note.getId())
+                .authorName(getAuthorName(note.getId()))
                 .views(0L)
                 .likes(0L)
                 .favorites(0L)
@@ -252,6 +261,12 @@ public class NoteService {
         note.setTitle(dto.getNewName());
         note.setUpdatedAt(LocalDateTime.now());
         noteMapper.update(note);
+
+        NoteStatsDO stats = noteStatsMapper.getById(note.getId());
+        if (stats != null) {
+            stats.setAuthorName(getAuthorName(note.getId()));
+            noteStatsMapper.updateOptimistic(stats);
+        }
 
         EsNoteEvent event = new EsNoteEvent();
         event.setNoteId(note.getId());

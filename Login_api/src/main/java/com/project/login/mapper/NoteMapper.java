@@ -30,6 +30,11 @@ public interface NoteMapper {
     })
     NoteDO selectById(Long id);
 
+    // 通过 noteId 查询 notebookId
+    @Select("SELECT notebook_id FROM notes WHERE id = #{id} LIMIT 1")
+    Long selectNotebookIdByNoteId(Long id);
+
+
     @Select("SELECT id, title, filename, file_type, notebook_id, created_at, updated_at " +
             "FROM notes WHERE notebook_id = #{notebookId} ORDER BY updated_at DESC")
     @ResultMap("NoteBaseResultMap")

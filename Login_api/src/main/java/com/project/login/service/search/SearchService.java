@@ -7,13 +7,17 @@ import com.project.login.model.dataobject.NoteStatsDO;
 import com.project.login.model.dto.search.NoteSearchDTO;
 import com.project.login.model.vo.NoteSearchVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,9 +31,10 @@ public class SearchService {
 
     private final NoteStatsMapper noteStatsMapper;
 
+    private final RedisTemplate<String, Object> redisTemplate;
     private final StringRedisTemplate redis;
 
-    private static final String REDIS_KEY_PREFIX = "note:stats:";
+    private static final String REDIS_KEY_PREFIX = "note_stats:";
 
     public List<NoteSearchVO> searchNotes(NoteSearchDTO dto) {
         String keyword = dto.getKeyword();
@@ -51,6 +56,12 @@ public class SearchService {
             response.hits().hits().forEach(hit -> {
                 NoteSearchVO vo = convert.toSearchVO(hit.source());
                 double score = hit.score() != null ? hit.score() : 0.0;
+
+                // 默认 contentSummary 为 title
+                if (vo.getContentSummary() == null) {
+                    vo.setContentSummary(vo.getTitle());
+                }
+
                 scoredNotes.add(new ScoredNote(vo, score));
             });
 
@@ -72,12 +83,15 @@ public class SearchService {
         // 将统计数据写入 VO
         scoredNotes.forEach(sn -> {
             NoteStatsDO stats = statsMap.get(sn.vo.getNoteId());
+            sn.vo.setAuthorName(stats.getAuthorName());
             sn.vo.setViewCount(stats.getViews().intValue());
             sn.vo.setLikeCount(stats.getLikes().intValue());
             sn.vo.setFavoriteCount(stats.getFavorites().intValue());
             sn.vo.setCommentCount(stats.getComments().intValue());
             sn.updatedAt = stats.getUpdatedAt();
+            sn.vo.setUpdatedAt(stats.getUpdatedAt());
         });
+
 
         // ==========================
         // 综合排序
@@ -102,51 +116,39 @@ public class SearchService {
      */
     private Map<Long, NoteStatsDO> loadStatsFromRedisThenMySQL(List<Long> ids) {
         Map<Long, NoteStatsDO> result = new HashMap<>();
-
-        List<Long> missIds = new ArrayList<>();
+        HashOperations<String, Object, Object> ops = redis.opsForHash();
 
         for (Long id : ids) {
-            String redisKey = REDIS_KEY_PREFIX + id;
-            Map<Object, Object> map = redis.opsForHash().entries(redisKey);
+            String key = REDIS_KEY_PREFIX + id;
+            Map<Object, Object> map = ops.entries(key);
 
-            if (map != null && !map.isEmpty()) {
-                result.put(id, mapToStats(id, map));
-            } else {
-                missIds.add(id);
+            if (map == null || map.isEmpty()) {
+                // Redis 未命中 → 查询 MySQL
+                NoteStatsDO db = noteStatsMapper.getById(id);
+                if (db == null) {
+                    db = defaultStats(id);
+                }
+                writeStatsToRedis(key, ops, db);
+                map = ops.entries(key);
             }
-        }
 
-        // Redis 未命中 → 批量查询 MySQL
-        if (!missIds.isEmpty()) {
-            List<NoteStatsDO> fromDb = noteStatsMapper.getByIds(missIds);
-
-            for (Long id : missIds) {
-                NoteStatsDO stats = fromDb.stream()
-                        .filter(s -> s.getNoteId().equals(id))
-                        .findFirst()
-                        .orElse(defaultStats(id));
-
-                result.put(id, stats);
-                writeStatsToRedis(stats); // 写入 Redis，提高后续命中率
-            }
+            result.put(id, mapToStats(id, map));
         }
 
         return result;
     }
 
-    /**
-     * 将 MySQL 数据写入 Redis 缓存
-     */
-    private void writeStatsToRedis(NoteStatsDO stats) {
-        String key = REDIS_KEY_PREFIX + stats.getNoteId();
-        redis.opsForHash().put(key, "views", String.valueOf(stats.getViews()));
-        redis.opsForHash().put(key, "likes", String.valueOf(stats.getLikes()));
-        redis.opsForHash().put(key, "favorites", String.valueOf(stats.getFavorites()));
-        redis.opsForHash().put(key, "comments", String.valueOf(stats.getComments()));
-        redis.opsForHash().put(key, "updatedAt", stats.getUpdatedAt() != null ? stats.getUpdatedAt().toString() : "");
-        redis.opsForHash().put(key, "version", String.valueOf(stats.getVersion()));
-        redis.expire(key, java.time.Duration.ofDays(7)); // 设置缓存过期
+    private void writeStatsToRedis(String key, HashOperations<String, Object, Object> ops, NoteStatsDO db) {
+        ops.put(key, "authorName", db.getAuthorName());
+        ops.put(key, "views", String.valueOf(db.getViews()));
+        ops.put(key, "likes", String.valueOf(db.getLikes()));
+        ops.put(key, "favorites", String.valueOf(db.getFavorites()));
+        ops.put(key, "comments", String.valueOf(db.getComments()));
+        ops.put(key, "last_activity_at", db.getLastActivityAt() == null ? "" : db.getLastActivityAt().toString());
+        ops.put(key, "version", String.valueOf(db.getVersion()));
+        redisTemplate.expire(key, 7, TimeUnit.DAYS);
     }
+
 
     /**
      * Redis Hash → DO
@@ -154,6 +156,7 @@ public class SearchService {
     private NoteStatsDO mapToStats(Long id, Map<Object, Object> map) {
         NoteStatsDO stats = new NoteStatsDO();
         stats.setNoteId(id);
+        stats.setAuthorName(map.get("authorName").toString());
         stats.setViews(Long.parseLong(map.getOrDefault("views", "0").toString()));
         stats.setLikes(Long.parseLong(map.getOrDefault("likes", "0").toString()));
         stats.setFavorites(Long.parseLong(map.getOrDefault("favorites", "0").toString()));
@@ -163,13 +166,13 @@ public class SearchService {
         stats.setUpdatedAt(updatedStr.isEmpty() ? null : LocalDateTime.parse(updatedStr));
 
         stats.setVersion(Long.parseLong(map.getOrDefault("version", "0").toString()));
-
         return stats;
     }
 
     private NoteStatsDO defaultStats(Long noteId) {
         NoteStatsDO stats = new NoteStatsDO();
         stats.setNoteId(noteId);
+        stats.setAuthorName("未知作者");
         stats.setViews(0L);
         stats.setLikes(0L);
         stats.setFavorites(0L);
@@ -195,6 +198,8 @@ public class SearchService {
         ScoredNote(NoteSearchVO vo, double score) {
             this.vo = vo;
             this.score = score;
+            this.updatedAt = vo.getUpdatedAt();
         }
     }
+
 }

@@ -11,15 +11,16 @@ public interface NoteStatsMapper {
     @Select("SELECT * FROM note_stats WHERE note_id = #{noteId}")
     NoteStatsDO getById(@Param("noteId") Long noteId);
 
-    @Insert("INSERT INTO note_stats(note_id, views, likes, favorites, comments, last_activity_at, version) " +
-            "VALUES(#{noteId}, #{views}, #{likes}, #{favorites}, #{comments}, #{lastActivityAt}, #{version})")
+    @Insert("INSERT INTO note_stats(note_id, author_name, views, likes, favorites, comments, last_activity_at, version) " +
+            "VALUES(#{noteId}, #{authorName}, #{views}, #{likes}, #{favorites}, #{comments}, #{lastActivityAt}, #{version})")
     void insert(NoteStatsDO noteStats);
 
     /** -----------------------------
-     * 乐观锁更新（你缺的就是这个）
+     * 乐观锁更新
      * ----------------------------- */
     @Update("UPDATE note_stats " +
-            "SET views=#{views}, likes=#{likes}, favorites=#{favorites}, comments=#{comments}, " +
+            "SET author_name=#{authorName}, " +
+            "views=#{views}, likes=#{likes}, favorites=#{favorites}, comments=#{comments}, " +
             "last_activity_at=#{lastActivityAt}, version=version+1 " +
             "WHERE note_id=#{noteId} AND version=#{version}")
     int updateOptimistic(NoteStatsDO noteStats);
@@ -38,6 +39,7 @@ public interface NoteStatsMapper {
     @Delete("DELETE FROM note_stats WHERE note_id = #{noteId}")
     int deleteById(@Param("noteId") Long noteId);
 
+    /** 增量更新（乐观锁） */
     @Update("UPDATE note_stats " +
             "SET views = views + #{views}, " +
             "likes = likes + #{likes}, " +
@@ -48,14 +50,15 @@ public interface NoteStatsMapper {
             "WHERE note_id = #{noteId} AND version = #{version}")
     int incrementByDeltas(NoteStatsDO noteStats);
 
+    /** 覆盖 totals（乐观锁） */
     @Update("UPDATE note_stats " +
-            "SET views = #{views}, " +
-            "likes = #{likes}, " +
-            "favorites = #{favorites}, " +
-            "comments = #{comments}, " +
-            "last_activity_at = #{lastActivityAt}, " +
+            "SET author_name=#{authorName}, " +
+            "views=#{views}, " +
+            "likes=#{likes}, " +
+            "favorites=#{favorites}, " +
+            "comments=#{comments}, " +
+            "last_activity_at=#{lastActivityAt}, " +
             "version = version + 1 " +
             "WHERE note_id = #{noteId} AND version = #{version}")
     int updateTotalsIfVersion(NoteStatsDO noteStats);
-
 }

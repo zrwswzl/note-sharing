@@ -23,9 +23,12 @@ public class UserDO {
 
     private String password_hash;
 
+    @Builder.Default
     private boolean enabled = false;
 
+    @Builder.Default
     private Instant createdAt = Instant.now();
 
+    @Builder.Default
     private Instant updatedAt = Instant.now();
 }

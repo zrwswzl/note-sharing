@@ -19,6 +19,12 @@ public interface NoteSpaceMapper {
     @Delete("DELETE FROM note_spaces WHERE id = #{id}")
     void deleteNoteSpace(Long id);
 
+    @Select("SELECT tag_id FROM note_spaces WHERE id = #{spaceId} LIMIT 1")
+    Long selectSpaceTagIdBySpaceId(Long spaceId);
+
+    @Select("SELECT user_id FROM note_spaces WHERE id = #{spaceId} LIMIT 1")
+    Long selectUserIdBySpaceId(Long spaceId);
+
     @Select("""
             SELECT ns.id, ns.name, ns.user_id, ns.tag_id,
                    ns.created_at, ns.updated_at
