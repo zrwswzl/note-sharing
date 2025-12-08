@@ -4,41 +4,43 @@ package com.project.login.service.remark;
 import com.project.login.convert.RemarkConvert;
 import com.project.login.mapper.NoteMapper;
 import com.project.login.mapper.UserMapper;
+import com.project.login.model.dataobject.RemarkCountDO;
 import com.project.login.model.dataobject.RemarkDO;
-import com.project.login.model.dataobject.RemarkLikeDO;
+import com.project.login.model.dataobject.RemarkLikeByUsersDO;
 import com.project.login.model.dataobject.UserDO;
 import com.project.login.model.dto.remark.RemarkDeleteDTO;
 import com.project.login.model.dto.remark.RemarkInsertDTO;
 import com.project.login.model.dto.remark.RemarkSelectByNoteDTO;
 import com.project.login.model.vo.RemarkVO;
 import com.project.login.repository.RemarkCountRepository;
-import com.project.login.repository.RemarkLikeRepository;
+import com.project.login.repository.RemarkLikeByUsersRepository;
 import com.project.login.repository.RemarkRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
 public class RemarkService {
     private final RemarkRepository remarkRepository;
-    private final RemarkLikeRepository remarkLikeRepository;
+    private final RemarkLikeByUsersRepository remarkLikeByUsersRepository;
     private final RemarkConvert remarkConvert;
     private final NoteMapper noteMapper;
     private final UserMapper userMapper;
     private final RemarkCountRepository remarkCountRepository;
-    private final RedisTemplate<String,Object> redisTemplate;
-    private final String remarkCountKey="remark_count:";
-    private final String remarkIdKey ="remark:";
-    private final String NoteIdKey="note_id_of_remark_list:";
-    private final String replyToIdKey="reply_to";
-    private final String 
+    private final RedisTemplate<String, Object> redisTemplate;
+    private final String remarkLikeCountKey = "remark_count:";
+    private final String remarkIdKey = "remark:";
+    private final String NoteIdKey = "note_id_of_remark_list:";
+    private final String replyToIdKey = "reply_to";
+    private final String userLikeRemarkListKey = "remark:user_like:";
+
     private RemarkVO transferDO2VO(RemarkDO remarkDO, UserDO user) {
         //初始转化与变量准备
         RemarkVO cur = remarkConvert.toVO(remarkDO);
@@ -49,19 +51,66 @@ public class RemarkService {
         RemarkDO receiveTORemark = receiveTORemarkOptional
                 .orElseThrow(() -> new RuntimeException("Receive remark not found for ID: " + receiveToRemarkId));
         // 设置是否已点赞
-        // ------
-        cur.setLikedOrNot(remarkLikeRepository.existsByRemarkIdAndUserId(
-                cur.get_id(),
-                loginUserId));
-        // ------
-        // 设置用户名和回复用户名
-        cur.setUsername(user.getUsername());
-        cur.setReplyToUsername(remarkDO.getReplyToUsername());
+        // ------ 设置是否已点赞 ------
+        String redisKey = userLikeRemarkListKey + remarkDO.get_id();
+        String userIdStr = loginUserId.toString();
+        boolean liked = false;
+
+        if (redisTemplate.hasKey(redisKey)) {
+            // Redis 有数据 → 直接判断
+            liked = Boolean.TRUE.equals(redisTemplate.opsForSet().isMember(redisKey, userIdStr));
+
+        } else {
+            // Redis 无数据 → 从数据库加载
+            Optional<RemarkLikeByUsersDO> likeRecord = remarkLikeByUsersRepository.findById(remarkDO.get_id());
+
+            if (likeRecord.isPresent()) {
+                Set<String> userList = likeRecord.get().getUserList();
+
+                if (userList != null && !userList.isEmpty()) {
+                    // 判断是否点赞
+                    liked = userList.contains(userIdStr);
+
+                    // 同步整个列表到 Redis
+                    redisTemplate.opsForSet().add(redisKey, userList.toArray(new String[0]));
+                }
+            }
+        }
+        // ------ 加载点赞数量 ------
+        Long likedCount = 0L;
+        String countKey = remarkLikeCountKey + remarkDO.get_id();
+
+        if (redisTemplate.hasKey(countKey)) {
+
+            Object countObj = redisTemplate.opsForHash().get(countKey, "remarkLikeCount");
+            if (countObj instanceof Long l) {
+                likedCount = l;
+            } else if (countObj instanceof Integer i) {
+                likedCount = i.longValue();
+            }
+
+        } else {
+
+            // Redis 无计数 → 从数据库加载
+            RemarkCountDO remarkCount = remarkCountRepository.findById(remarkDO.get_id())
+                    .orElse(null);
+
+            if (remarkCount != null) {
+                likedCount = remarkCount.getRemarkLikeCount();
+                // 同步到 Redis（hash）
+                redisTemplate.opsForHash().put(countKey, "remarkLikeCount", remarkCount.getRemarkLikeCount());
+                redisTemplate.opsForHash().put(countKey, "version", remarkCount.getVersion());
+            }
+        }
+
+        cur.setLikedOrNot(liked);
+        cur.setLikeCount(likedCount); // <--- 记得 VO 里要有该字段
 
         return cur;
     }
+
     @Transactional
-    public List<RemarkVO> SelectRemark(RemarkSelectByNoteDTO remarkSelectByNoteDTO, Long loginUserId){
+    public List<RemarkVO> SelectRemark(RemarkSelectByNoteDTO remarkSelectByNoteDTO, Long loginUserId) {
 // 获取当前用户信息
         UserDO user = userMapper.selectById(loginUserId);
         Long noteId = remarkSelectByNoteDTO.getNoteId();
@@ -70,43 +119,43 @@ public class RemarkService {
         List<RemarkVO> result = new ArrayList<>();
 
 // --- 一级评论列表处理 ---
-        if(redisTemplate.hasKey(noteKey)){
+        if (redisTemplate.hasKey(noteKey)) {
             // 从Redis读取一级评论ID列表
             List<Object> tmpList = redisTemplate.opsForList().range(noteKey, 0, -1);
-            if(tmpList != null){
+            if (tmpList != null) {
                 remarkFirstLayerList = tmpList.stream().map(Object::toString).toList();
             }
         } else {
             // Redis中没有则从MongoDB读取
             List<RemarkDO> tmpRemarkDOList = remarkRepository.findRemarksByNoteIdAndIsReceiveFalse(noteId);
-            for(RemarkDO cur : tmpRemarkDOList){
-                if(cur != null && cur.get_id() != null){
+            for (RemarkDO cur : tmpRemarkDOList) {
+                if (cur != null && cur.get_id() != null) {
                     remarkFirstLayerList.add(cur.get_id());
                 }
             }
             // 将一级评论ID列表写入Redis
-            if(!remarkFirstLayerList.isEmpty()){
-                redisTemplate.opsForList().rightPushAll(noteKey, remarkFirstLayerList);
+            if (!remarkFirstLayerList.isEmpty()) {
+                redisTemplate.opsForList().rightPushAll(noteKey, remarkFirstLayerList, Duration.ofHours(1));
             }
         }
 
 // --- 遍历一级评论 ---
-        for(String cur : remarkFirstLayerList){
+        for (String cur : remarkFirstLayerList) {
             RemarkDO curDO = null;
             // 尝试从Redis获取一级评论对象
-            if(redisTemplate.hasKey(remarkIdKey + cur)){
+            if (redisTemplate.hasKey(remarkIdKey + cur)) {
                 curDO = (RemarkDO) redisTemplate.opsForValue().get(remarkIdKey + cur);
             }
-            if(curDO == null){
+            if (curDO == null) {
                 // Redis没有则从MongoDB获取
                 curDO = remarkRepository.findById(cur).orElse(null);
-                if(curDO != null){
-                    redisTemplate.opsForValue().set(remarkIdKey + cur, curDO);
+                if (curDO != null) {
+                    redisTemplate.opsForValue().set(remarkIdKey + cur, curDO, Duration.ofHours(1));
                 }
             }
 
             // 如果一级评论对象为空，跳过
-            if(curDO == null) continue;
+            if (curDO == null) continue;
 
             // 将DO转换为VO
             RemarkVO curVO = transferDO2VO(curDO, user);
@@ -114,18 +163,18 @@ public class RemarkService {
             // --- 二级评论列表处理 ---
             List<String> remarkSecondLayerList = new ArrayList<>();
             String replyKey = replyToIdKey + cur;
-            if(redisTemplate.hasKey(replyKey)){
+            if (redisTemplate.hasKey(replyKey)) {
                 // 从Redis获取二级评论ID列表
                 List<Object> tmpReplyList = redisTemplate.opsForList().range(replyKey, 0, -1);
-                if(tmpReplyList != null){
+                if (tmpReplyList != null) {
                     remarkSecondLayerList = tmpReplyList.stream().map(Object::toString).toList();
                 }
             } else {
                 // Redis没有则从MongoDB获取
                 List<RemarkDO> replyList = remarkRepository.findRemarksByParentIdAndIsReceiveTrue(cur);
-                for(RemarkDO reply : replyList){
-                    if(reply != null && reply.get_id() != null){
-                        redisTemplate.opsForValue().set(remarkIdKey + reply.get_id(), reply);
+                for (RemarkDO reply : replyList) {
+                    if (reply != null && reply.get_id() != null) {
+                        redisTemplate.opsForValue().set(remarkIdKey + reply.get_id(), reply, Duration.ofHours(1));
                         remarkSecondLayerList.add(reply.get_id());
                     }
                 }
@@ -133,42 +182,58 @@ public class RemarkService {
 
             // --- 二级评论VO构建 ---
             List<RemarkVO> replies = new ArrayList<>();
-            for(String replyId : remarkSecondLayerList){
+
+            for (String replyId : remarkSecondLayerList) {
+
                 RemarkDO replyDO = null;
-                if(redisTemplate.hasKey(remarkIdKey + replyId)){
-                    replyDO = (RemarkDO) redisTemplate.opsForValue().get(remarkIdKey + replyId);
+
+                // 先查 Redis
+                String redisKey = remarkIdKey + replyId;
+                if (redisTemplate.hasKey(redisKey)) {
+                    replyDO = (RemarkDO) redisTemplate.opsForValue().get(redisKey);
                 }
-                if(replyDO != null){
+
+                //  Redis 中没有 → 查 MongoDB
+                if (replyDO == null) {
+                    replyDO = remarkRepository.findById(replyId)
+                            .orElse(null);
+
+                    //  查到了 → 写回 Redis，提升下次命中率
+                    if (replyDO != null) {
+                        redisTemplate.opsForValue().set(redisKey, replyDO, Duration.ofHours(1));
+                    }
+                }
+
+                //  查不到就跳过
+                if (replyDO != null) {
                     RemarkVO replyVO = transferDO2VO(replyDO, user);
                     replies.add(replyVO);
                 }
             }
-            curVO.setReplies(replies);
 
-            // 将一级评论VO加入结果列表
-            result.add(curVO);
+            curVO.setReplies(replies);
         }
         return result;
     }
 
     @Transactional
-    public List<RemarkVO> selectRemarkByUserId(UserDO user){
+    public List<RemarkVO> selectRemarkByUserId(UserDO user) {
         Long loginUserId = user.getId();
         List<RemarkVO> remarkVOList = new ArrayList<>();
 
 // 从数据库获取该用户所有一级评论
         List<RemarkDO> remarkDOList = remarkRepository.findByUserId(loginUserId);
 
-        for(RemarkDO curDO : remarkDOList){
-            if(curDO == null || curDO.get_id() == null) continue;
+        for (RemarkDO curDO : remarkDOList) {
+            if (curDO == null || curDO.get_id() == null) continue;
 
             // --- 一级评论对象处理 ---
             String curKey = remarkIdKey + curDO.get_id();
             RemarkDO cachedCurDO = null;
-            if(redisTemplate.hasKey(curKey)){
+            if (redisTemplate.hasKey(curKey)) {
                 cachedCurDO = (RemarkDO) redisTemplate.opsForValue().get(curKey);
             }
-            if(cachedCurDO == null){
+            if (cachedCurDO == null) {
                 // Redis没有则使用数据库对象，并写入Redis
                 cachedCurDO = curDO;
                 redisTemplate.opsForValue().set(curKey, curDO);
@@ -180,17 +245,17 @@ public class RemarkService {
             // --- 二级评论对象处理 ---
             List<String> remarkSecondLayerList = new ArrayList<>();
             String replyKey = replyToIdKey + curDO.get_id();
-            if(redisTemplate.hasKey(replyKey)){
+            if (redisTemplate.hasKey(replyKey)) {
                 List<Object> tmpReplyList = redisTemplate.opsForList().range(replyKey, 0, -1);
-                if(tmpReplyList != null){
+                if (tmpReplyList != null) {
                     remarkSecondLayerList = tmpReplyList.stream().map(Object::toString).toList();
                 }
             } else {
                 // Redis没有则从数据库加载二级评论，并写入Redis
                 List<RemarkDO> replyList = remarkRepository.findRemarksByParentIdAndIsReceiveTrue(curDO.get_id());
-                for(RemarkDO reply : replyList){
-                    if(reply != null && reply.get_id() != null){
-                        redisTemplate.opsForValue().set(remarkIdKey + reply.get_id(), reply);
+                for (RemarkDO reply : replyList) {
+                    if (reply != null && reply.get_id() != null) {
+                        redisTemplate.opsForValue().set(remarkIdKey + reply.get_id(), reply, Duration.ofHours(1));
                         remarkSecondLayerList.add(reply.get_id());
                     }
                 }
@@ -198,19 +263,19 @@ public class RemarkService {
 
             // --- 构建二级评论VO ---
             List<RemarkVO> replies = new ArrayList<>();
-            for(String replyId : remarkSecondLayerList){
+            for (String replyId : remarkSecondLayerList) {
                 RemarkDO replyDO = null;
                 String replyRedisKey = remarkIdKey + replyId;
-                if(redisTemplate.hasKey(replyRedisKey)){
+                if (redisTemplate.hasKey(replyRedisKey)) {
                     replyDO = (RemarkDO) redisTemplate.opsForValue().get(replyRedisKey);
                 }
-                if(replyDO == null){
+                if (replyDO == null) {
                     replyDO = remarkRepository.findById(replyId).orElse(null);
-                    if(replyDO != null){
-                        redisTemplate.opsForValue().set(replyRedisKey, replyDO);
+                    if (replyDO != null) {
+                        redisTemplate.opsForValue().set(replyRedisKey, replyDO, Duration.ofHours(1));
                     }
                 }
-                if(replyDO != null){
+                if (replyDO != null) {
                     RemarkVO replyVO = transferDO2VO(replyDO, user);
                     replies.add(replyVO);
                 }
@@ -224,6 +289,7 @@ public class RemarkService {
         return remarkVOList;
 
     }
+
     @Transactional
     public Boolean insertRemark(RemarkInsertDTO remarkInsertDTO) {
         try {
@@ -294,7 +360,10 @@ public class RemarkService {
 
                 // 删除子评论点赞和缓存
                 for (String childId : childIds) {
-                    remarkLikeRepository.deleteByRemarkId(childId);
+                    remarkLikeByUsersRepository.deleteById(childId);
+                    remarkCountRepository.deleteById(childId);
+                    redisTemplate.delete(remarkLikeCountKey + childId);
+                    redisTemplate.delete(userLikeRemarkListKey + childId);
                     redisTemplate.delete(remarkIdKey + childId);
                 }
 
@@ -303,7 +372,7 @@ public class RemarkService {
             }
 
             // 3. 删除该评论的点赞记录和数据库记录
-            remarkLikeRepository.deleteByRemarkId(remarkDO.get_id());
+            remarkLikeByUsersRepository.deleteById(remarkDO.get_id());
             remarkRepository.deleteById(remarkDO.get_id());
 
             // 4. 删除 Redis 缓存（第一次删除）
@@ -339,46 +408,157 @@ public class RemarkService {
 
     @Transactional
     public Boolean likeRemark(String remarkId, Long userId) {
+
+        String redisKey = userLikeRemarkListKey + remarkId;
+
         // 1. 检查用户是否已点赞
-        Boolean exists = remarkLikeRepository.existsByRemarkIdAndUserId(remarkId, userId);
+        Boolean exists = false;
+
+        if (redisTemplate.hasKey(redisKey)) {
+            exists = redisTemplate.opsForSet().isMember(redisKey, userId.toString());
+        } else {
+            // Redis 无数据，则从数据库加载
+            Optional<RemarkLikeByUsersDO> likeRecord =
+                    remarkLikeByUsersRepository.findById(remarkId);
+
+            if (likeRecord.isPresent()) {
+
+                Set<String> userList = likeRecord.get().getUserList();
+
+                if (userList != null && !userList.isEmpty()) {
+                    exists = userList.contains(userId.toString());
+
+                    // 同步整个 Set 到 Redis
+                    redisTemplate.opsForSet().add(redisKey, userList.toArray(new String[0]));
+                } else {
+                    exists = false;
+                }
+            } else {
+                exists = false;
+            }
+        }
+
         if (Boolean.TRUE.equals(exists)) {
             return false; // 已经点赞过
         }
 
-        // 2. 插入点赞记录
-        RemarkLikeDO like = RemarkLikeDO.builder()
-                .remarkId(remarkId)
-                .userId(userId)
-                .createdAt(LocalDateTime.now())
-                .build();
-        remarkLikeRepository.save(like);
+        // 3. 更新 Redis 缓存
+        redisTemplate.opsForSet().add(redisKey, userId.toString());
 
-        // 3. 更新评论的 likes 数
-        RemarkDO remark = remarkRepository.findBy_id(remarkId)
-                .orElseThrow(() -> new RuntimeException("Remark not found for ID: " + remarkId));
-        remark.setLikes(remark.getLikes() == null ? 1 : remark.getLikes() + 1);
-        remarkRepository.save(remark);
+        // 4. 更新评论的 likes 数
+        String countKey = remarkLikeCountKey + remarkId;
+
+        Long newCount;
+
+        if (redisTemplate.hasKey(countKey)) {
+
+            // Redis 已有点赞计数，直接自增
+            newCount = redisTemplate.opsForHash().increment(countKey, "remarkLikeCount", 1);
+
+        } else {
+
+            // Redis 中没有，从 MongoDB 加载
+            RemarkCountDO remarkCount = remarkCountRepository.findById(remarkId)
+                    .orElseGet(() -> RemarkCountDO.builder()
+                            .remarkId(remarkId)
+                            .remarkLikeCount(0L)
+                            .version(0L)
+                            .build()
+                    );
+
+            // 同步到 Redis（作为 Hash）
+            redisTemplate.opsForHash().put(countKey, "remarkLikeCount", remarkCount.getRemarkLikeCount());
+            redisTemplate.opsForHash().put(countKey, "version", remarkCount.getVersion());
+
+            // 自增一次
+            redisTemplate.opsForHash().increment(countKey, "remarkLikeCount", 1);
+        }
+
 
         return true;
     }
 
     @Transactional
     public Boolean cancelLikeRemark(String remarkId, Long userId) {
-        // 1. 检查点赞记录是否存在
-        Boolean exists = remarkLikeRepository.existsByRemarkIdAndUserId(remarkId, userId);
-        if (!Boolean.TRUE.equals(exists)) {
-            return false; // 没有点赞过
+
+        String redisKey = userLikeRemarkListKey + remarkId;
+        String userIdStr = userId.toString();
+
+        // 1. 判断是否已点赞（Redis → MongoDB）
+        Boolean exists = false;
+
+        if (redisTemplate.hasKey(redisKey)) {
+            exists = redisTemplate.opsForSet().isMember(redisKey, userIdStr);
+        } else {
+            // Redis 无数据 → MongoDB 加载
+            Optional<RemarkLikeByUsersDO> likeRecord =
+                    remarkLikeByUsersRepository.findById(remarkId);
+
+            if (likeRecord.isPresent()) {
+                Set<String> userList = likeRecord.get().getUserList();
+
+                if (userList != null && !userList.isEmpty()) {
+                    exists = userList.contains(userIdStr);
+
+                    // 同步整个 Set 到 Redis
+                    redisTemplate.opsForSet().add(redisKey, userList.toArray(new String[0]));
+                } else {
+                    exists = false;
+                }
+            } else {
+                exists = false;
+            }
         }
 
-        // 2. 删除点赞记录// 注意：如果一条评论可能有多个用户点赞，这里应改为删除指定用户
-        remarkLikeRepository.deleteByRemarkIdAndUserId(remarkId, userId);
+        if (!Boolean.TRUE.equals(exists)) {
+            return false; // 根本没点赞过
+        }
 
-        // 3. 更新评论的 likes 数
-        RemarkDO remark = remarkRepository.findBy_id(remarkId)
-                .orElseThrow(() -> new RuntimeException("Remark not found for ID: " + remarkId));
-        remark.setLikes(remark.getLikes() == null || remark.getLikes() <= 0 ? 0 : remark.getLikes() - 1);
-        remarkRepository.save(remark);
 
+        // 2. Redis 取消点赞
+        redisTemplate.opsForSet().remove(redisKey, userIdStr);
+
+
+        // 3. MongoDB 中从 userList 移除用户
+        remarkLikeByUsersRepository.findById(remarkId).ifPresent(record -> {
+            Set<String> userList = record.getUserList();
+            if (userList != null) {
+                userList.remove(userIdStr);
+            }
+            remarkLikeByUsersRepository.save(record);
+        });
+
+
+        // 4. 更新点赞计数（Redis → MongoDB）
+        String countKey = remarkLikeCountKey + remarkId;
+
+        if (redisTemplate.hasKey(countKey)) {
+
+            // Redis 已有计数，直接减 1（但不低于 0）
+            Long current = (Long) redisTemplate.opsForHash().get(countKey, "remarkLikeCount");
+            if (current == null || current <= 0) {
+                redisTemplate.opsForHash().put(countKey, "remarkLikeCount", 0L);
+            } else {
+                redisTemplate.opsForHash().increment(countKey, "remarkLikeCount", -1);
+            }
+        } else {
+            // Redis 无计数 → 从 DB 加载
+            RemarkCountDO remarkCount = remarkCountRepository.findById(remarkId)
+                    .orElse(null);
+            if (remarkCount == null) {
+                return false;
+            }
+
+
+            // 同步到 Redis
+            redisTemplate.opsForHash().put(countKey, "remarkLikeCount", remarkCount.getRemarkLikeCount());
+            redisTemplate.opsForHash().put(countKey, "version", remarkCount.getVersion());
+
+            // 自减一次（不低于 0）
+            if (remarkCount.getRemarkLikeCount() > 0) {
+                redisTemplate.opsForHash().increment(countKey, "remarkLikeCount", -1);
+            }
+        }
         return true;
     }
 }
