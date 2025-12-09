@@ -175,6 +175,33 @@ export const getFileUrl = (filename) => {
         .then(res => res.data.data);
 };
 
+/**
+ * [对应后端: POST /noting/notes/files/id_url]
+ * 通过笔记ID获取文件访问 URL (返回 String)
+ * @param {number} noteId - 笔记ID
+ */
+export const getFileUrlByNoteId = (noteId) => {
+    // 后端使用 @RequestParam，所以使用查询参数
+    return service.post(`/noting/notes/files/id_url`, null, {
+        params: { noteId: noteId }
+    })
+        .then(res => res.data.data);
+};
+
+// =========================================================
+//                        笔记统计 API
+// =========================================================
+
+/**
+ * [对应后端: GET /note-stats/{noteId}]
+ * 获取笔记统计信息 (返回 NoteStatsVO)
+ * @param {number} noteId - 笔记ID
+ */
+export const getNoteStats = (noteId) => {
+    return service.get(`/note-stats/${noteId}`)
+        .then(res => res.data.data);
+};
+
 // =========================================================
 //                        搜索 API
 // =========================================================

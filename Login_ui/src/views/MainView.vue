@@ -83,7 +83,16 @@
       </section>
 
       <section v-else-if="currentTab === 'search'">
-        <SearchView :initialKeyword="searchKeywordFromRoute" />
+        <SearchView 
+          :initialKeyword="searchKeywordFromRoute" 
+          @open-note-detail="handleOpenNoteDetail"
+        />
+      </section>
+      <section v-else-if="currentTab === 'note-detail' && viewingNoteId">
+        <NoteDetailView 
+          :noteId="viewingNoteId" 
+          :initialStats="noteDetailStats"
+        />
       </section>
       <section v-else-if="currentTab === 'workspace'">
         <WorkspaceView 
@@ -113,6 +122,7 @@ import ProfileView from '../components/user/ProfileView.vue'
 import FavoritesView from '../components/user/FavoritesView.vue'
 import CommentsView from '../components/user/CommentsView.vue'
 import NoteEditorView from '../components/user/NoteEditorView.vue'
+import NoteDetailView from '../components/user/NoteDetailView.vue'
 import { useRouter, useRoute } from 'vue-router'
 import service from '../api/request'
 import { useUserStore } from '@/stores/user'
@@ -137,8 +147,8 @@ const searchKeywordFromRoute = ref('')
 // 从 URL 查询参数中读取 tab，如果没有则使用默认值
 const getTabFromRoute = () => {
   const tabFromQuery = route.query.tab
-  // 验证 tab 值是否有效（包括search tab）
-  const validTabs = [...tabs.map(t => t.value), 'search', 'profile']
+  // 验证 tab 值是否有效（包括search tab和note-detail tab）
+  const validTabs = [...tabs.map(t => t.value), 'search', 'profile', 'note-detail']
   if (tabFromQuery && validTabs.includes(tabFromQuery)) {
     return tabFromQuery
   }
@@ -159,11 +169,18 @@ watch(currentTab, (newTab) => {
 
 // 监听路由变化，从 URL 中恢复 tab 状态（处理浏览器前进/后退）
 watch(() => route.query.tab, (newTab) => {
-  if (newTab && tabs.map(t => t.value).includes(newTab)) {
-    currentTab.value = newTab
-    // 当切换到 workspace tab 时，恢复选中的空间
-    if (newTab === 'workspace') {
-      restoreWorkspaceFromRoute()
+  if (newTab) {
+    const validTabs = [...tabs.map(t => t.value), 'search', 'profile', 'note-detail']
+    if (validTabs.includes(newTab)) {
+      currentTab.value = newTab
+      // 当切换到 workspace tab 时，恢复选中的空间
+      if (newTab === 'workspace') {
+        restoreWorkspaceFromRoute()
+      }
+      // 当切换到 note-detail tab 时，恢复笔记ID
+      if (newTab === 'note-detail') {
+        restoreNoteDetailFromRoute()
+      }
     }
   }
 })
@@ -187,6 +204,8 @@ const editingNotebookName = ref(null);
 const editingNotebookList = ref([]); // 使用数组类型
 const editingNoteId = ref(null); // 当前选中的笔记ID
 const selectedWorkspaceId = ref(null); // 当前选中的笔记空间ID（在workspace tab时）
+const viewingNoteId = ref(null); // 当前查看的笔记详情ID（用于note-detail tab）
+const noteDetailStats = ref(null); // 笔记详情页的统计信息（从搜索结果传递过来）
 
 // 获取标签名称的辅助函数
 const getTagNameString = async (tag) => {
@@ -362,6 +381,19 @@ const restoreWorkspaceFromRoute = () => {
   }
 }
 
+// 从 URL 恢复笔记详情页状态
+const restoreNoteDetailFromRoute = () => {
+  if (currentTab.value === 'note-detail') {
+    const noteIdFromQuery = route.query.noteId
+    if (noteIdFromQuery) {
+      const noteId = Number(noteIdFromQuery)
+      if (!isNaN(noteId) && noteId > 0) {
+        viewingNoteId.value = noteId
+      }
+    }
+  }
+}
+
 // 处理 WorkspaceView 发出的"空间选中"事件
 const handleWorkspaceSelected = (workspaceId) => {
   selectedWorkspaceId.value = workspaceId
@@ -403,6 +435,39 @@ const handleSearch = () => {
   })
 }
 
+// 处理打开笔记详情页（从搜索结果点击）
+const handleOpenNoteDetail = (payload) => {
+  if (payload && payload.noteId) {
+    viewingNoteId.value = payload.noteId
+    currentTab.value = 'note-detail'
+    
+    // 保存统计信息（如果从搜索结果传递过来）
+    if (payload.authorName !== undefined || payload.viewCount !== undefined) {
+      noteDetailStats.value = {
+        authorName: payload.authorName || '未知作者',
+        views: payload.viewCount || 0,
+        likes: payload.likeCount || 0,
+        favorites: payload.favoriteCount || 0,
+        comments: payload.commentCount || 0
+      }
+    } else {
+      noteDetailStats.value = null // 如果没有传递统计信息，让组件自己获取
+    }
+    
+    // 更新URL参数
+    router.replace({
+      path: route.path,
+      query: {
+        ...route.query,
+        tab: 'note-detail',
+        noteId: payload.noteId,
+        title: payload.title || undefined,
+        fileType: payload.fileType || undefined
+      }
+    })
+  }
+}
+
 // 监听路由中的搜索关键词
 watch(() => route.query.keyword, (newKeyword) => {
   if (newKeyword && currentTab.value === 'search') {
@@ -428,6 +493,9 @@ onMounted(async () => {
   
   // 恢复 workspace tab 的选中空间
   restoreWorkspaceFromRoute()
+  
+  // 恢复笔记详情页状态
+  restoreNoteDetailFromRoute()
   
   // 尝试从 URL 恢复编辑器状态
   await restoreEditorFromRoute()

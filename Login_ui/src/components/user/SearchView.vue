@@ -90,6 +90,8 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['open-note-detail'])
+
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
@@ -107,28 +109,40 @@ const highlightKeyword = (text) => {
   return text.replace(regex, '<mark class="highlight">$1</mark>')
 }
 
-// 处理搜索结果点击
+// 处理搜索结果点击 - 跳转到笔记详情页
 const handleResultClick = async (result) => {
-  // 需要获取笔记所属的notebook和space信息
-  // 暂时先尝试通过API获取
+  if (!result || !result.noteId) {
+    console.error('搜索结果数据无效:', result)
+    return
+  }
+  
   try {
-    // 这里需要调用API获取notebook信息
-    // 由于后端可能没有直接通过noteId获取notebook的接口，我们先尝试其他方式
-    // 或者可以显示一个提示，让用户知道需要从"我的笔记"中打开
+    // 发出事件通知父组件（MainView）显示笔记详情页，传递统计信息
+    emit('open-note-detail', {
+      noteId: result.noteId,
+      title: result.title || '无标题',
+      fileType: result.fileType || 'md', // 默认markdown类型
+      // 传递统计信息
+      authorName: result.authorName,
+      viewCount: result.viewCount,
+      likeCount: result.likeCount,
+      favoriteCount: result.favoriteCount,
+      commentCount: result.commentCount
+    })
     
-    // 暂时先跳转到workspace tab，让用户自己查找
+    // 更新URL参数，记录当前查看的笔记
     router.replace({
       path: route.path,
       query: {
         ...route.query,
-        tab: 'workspace'
+        tab: 'note-detail',
+        noteId: result.noteId,
+        title: result.title || undefined,
+        fileType: result.fileType || undefined
       }
     })
-    
-    // TODO: 实现通过noteId获取notebook和space信息，然后打开笔记编辑器
-    console.log('点击搜索结果:', result)
   } catch (error) {
-    console.error('打开笔记失败:', error)
+    console.error('打开笔记详情页失败:', error)
   }
 }
 
