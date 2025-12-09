@@ -131,6 +131,13 @@ public class NoteController {
         return StandardResponse.success(fileUrl);
     }
 
+    @Operation(summary = "Get file access URL by noteId")
+    @PostMapping("/files/id_url")
+    public StandardResponse<String> getFileUrlByNoteId(@Valid @RequestParam("noteId") Long noteId) {
+        String fileUrl = noteService.getFileUrlByNoteId(noteId);
+        return StandardResponse.success(fileUrl);
+    }
+
     @Operation(summary = "Upload image and return access URL")
     @PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public StandardResponse<String> uploadImage(@RequestPart("file") MultipartFile file) {

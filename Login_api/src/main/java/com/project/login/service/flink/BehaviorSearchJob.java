@@ -14,7 +14,6 @@ import org.apache.flink.util.Collector;
 import redis.clients.jedis.Jedis;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -71,7 +70,6 @@ public class BehaviorSearchJob {
                 .map(fused -> "FusedProfile: " + fused)
                 .print();
 
-        // -------------------- Top-N 热点计算 --------------------
         // -------------------- Top-N 热点计算 --------------------
         topNStream
                 // 不按 noteId keyBy，而是使用全局 key（所有事件合并计算 Top-N）

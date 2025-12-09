@@ -34,6 +34,9 @@ public interface NoteMapper {
     @Select("SELECT notebook_id FROM notes WHERE id = #{id} LIMIT 1")
     Long selectNotebookIdByNoteId(Long id);
 
+    @Select("SELECT filename FROM notes WHERE id = #{id} LIMIT 1")
+    String selectFileNameByNoteId(Long id);
+
 
     @Select("SELECT id, title, filename, file_type, notebook_id, created_at, updated_at " +
             "FROM notes WHERE notebook_id = #{notebookId} ORDER BY updated_at DESC")
