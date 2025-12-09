@@ -1,44 +1,5 @@
 <template>
   <div class="search-page">
-    <section class="search-panel">
-      <header class="panel-header">
-        <div>
-          <p class="section-label">全局检索</p>
-          <div class="title-row">
-            <h2>查询笔记</h2>
-            <span class="active-indicator">Search</span>
-          </div>
-          <p class="panel-subtext">
-            支持笔记、笔记本、空间、标签与用户的统一搜索，输入关键词即可快速定位内容。
-          </p>
-        </div>
-      </header>
-
-      <div class="search-bar">
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="可输入笔记、笔记本、空间、标签、用户查询"
-          @keyup.enter="handleSearch"
-        />
-        <button class="text-action" @click="handleSearch">
-          <span>开始搜索</span>
-          <span aria-hidden="true">↗</span>
-        </button>
-      </div>
-
-      <div class="hint-row">
-        <span>快速提示：</span>
-        <ul>
-          <li># 笔记</li>
-          <li># 笔记本</li>
-          <li># 空间</li>
-          <li># 标签</li>
-          <li># 用户</li>
-        </ul>
-      </div>
-    </section>
-
     <section class="results-panel">
       <div v-if="loading" class="state-card">
         <span class="loader" aria-hidden="true"></span>
@@ -47,17 +8,59 @@
       </div>
 
       <div v-else-if="searchResults.length > 0" class="results-list">
+        <div class="results-header">
+          <p class="results-count">找到 <strong>{{ searchResults.length }}</strong> 条相关结果</p>
+          <p class="search-keyword" v-if="searchQuery">搜索关键词：<strong>{{ searchQuery }}</strong></p>
+        </div>
         <article
           v-for="result in searchResults"
-          :key="result.id"
+          :key="result.noteId"
           class="result-card"
+          @click="handleResultClick(result)"
         >
-          <header class="result-head">
-            <span class="result-type">{{ result.type }}</span>
-            <span class="result-indicator" aria-hidden="true">↗</span>
-          </header>
-          <h3 class="result-title">{{ result.title }}</h3>
-          <p class="result-info">{{ result.info }}</p>
+          <div class="result-content">
+            <h3 class="result-title" v-html="highlightKeyword(result.title)"></h3>
+            <p class="result-summary" v-html="highlightKeyword(result.contentSummary || result.title)"></p>
+            <div class="result-meta">
+              <div class="meta-left">
+                <span class="meta-author">
+                  <svg class="meta-icon" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm2-3a2 2 0 11-4 0 2 2 0 014 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
+                  </svg>
+                  {{ result.authorName || '未知作者' }}
+                </span>
+                <span class="meta-time">
+                  <svg class="meta-icon" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 3.5a.5.5 0 00-1 0V9a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 8.71V3.5z"/>
+                    <path d="M8 16A8 8 0 108 0a8 8 0 000 16zm8-8A8 8 0 111 8a8 8 0 0115 0z"/>
+                  </svg>
+                  {{ formatTime(result.updatedAt) }}
+                </span>
+              </div>
+              <div class="meta-right">
+                <span class="meta-stat">
+                  <svg class="meta-icon" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 4a.5.5 0 01.5.5v3h3a.5.5 0 010 1h-3v3a.5.5 0 01-1 0v-3h-3a.5.5 0 010-1h3v-3A.5.5 0 018 4z"/>
+                  </svg>
+                  {{ result.viewCount || 0 }} 阅读
+                </span>
+                <span class="meta-stat">
+                  <svg class="meta-icon" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 15A7 7 0 118 1a7 7 0 010 14zm0 1A8 8 0 108 0a8 8 0 000 16z"/>
+                    <path d="M8 4a.5.5 0 00-.5.5v3h-3a.5.5 0 000 1h3v3a.5.5 0 001 0v-3h3a.5.5 0 000-1h-3v-3A.5.5 0 008 4z"/>
+                  </svg>
+                  {{ result.likeCount || 0 }} 点赞
+                </span>
+                <span class="meta-stat">
+                  <svg class="meta-icon" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M2.5 1A1.5 1.5 0 001 2.5v11A1.5 1.5 0 002.5 15h6.086a1.5 1.5 0 001.06-.44l4.915-4.914A1.5 1.5 0 0015 7.586V2.5A1.5 1.5 0 0013.5 1h-11zM2 2.5a.5.5 0 01.5-.5h11a.5.5 0 01.5.5v7.086a.5.5 0 01-.146.353l-4.915 4.915a.5.5 0 01-.353.146H2.5a.5.5 0 01-.5-.5v-11z"/>
+                    <path d="M5.5 6a.5.5 0 000 1h5a.5.5 0 000-1h-5zM5 8.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zm0 2a.5.5 0 01.5-.5h2a.5.5 0 010 1h-2a.5.5 0 01-.5-.5z"/>
+                  </svg>
+                  {{ result.commentCount || 0 }} 评论
+                </span>
+              </div>
+            </div>
+          </div>
         </article>
       </div>
 
@@ -75,263 +78,303 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import { searchNotes } from '@/api/note'
+import { useUserStore } from '@/stores/user'
+import service from '@/api/request'
+
+const props = defineProps({
+  initialKeyword: {
+    type: String,
+    default: ''
+  }
+})
+
+const router = useRouter()
+const route = useRoute()
+const userStore = useUserStore()
 
 const searchQuery = ref('')
 const searchResults = ref([])
 const loading = ref(false)
 const hasSearched = ref(false)
 
-/**
- * API: 搜索笔记
- * POST /api/search
- * 输入: {
- *   query: string,  // 搜索关键词
- *   type: string    // 可选: 'note', 'notebook', 'space', 'tag', 'user', 'all'
- * }
- * 输出: {
- *   code: number,
- *   data: [
- *     {
- *       id: string,
- *       type: string,      // 'note', 'notebook', 'space', 'tag', 'user'
- *       title: string,     // 标题/名称
- *       info: string,      // 附加信息(如笔记所属笔记本等)
- *       content: string    // 笔记内容预览(仅笔记类型)
- *     }
- *   ]
- * }
- */
+// 格式化时间
+const formatTime = (timeStr) => {
+  if (!timeStr) return '未知时间'
+  const date = new Date(timeStr)
+  const now = new Date()
+  const diff = now - date
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(diff / 86400000)
+  
+  if (minutes < 1) return '刚刚'
+  if (minutes < 60) return `${minutes}分钟前`
+  if (hours < 24) return `${hours}小时前`
+  if (days < 7) return `${days}天前`
+  
+  return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
+}
+
+// 高亮关键词
+const highlightKeyword = (text) => {
+  if (!text || !searchQuery.value.trim()) return text
+  const keyword = searchQuery.value.trim()
+  const regex = new RegExp(`(${keyword})`, 'gi')
+  return text.replace(regex, '<mark class="highlight">$1</mark>')
+}
+
+// 处理搜索结果点击
+const handleResultClick = async (result) => {
+  // 需要获取笔记所属的notebook和space信息
+  // 暂时先尝试通过API获取
+  try {
+    // 这里需要调用API获取notebook信息
+    // 由于后端可能没有直接通过noteId获取notebook的接口，我们先尝试其他方式
+    // 或者可以显示一个提示，让用户知道需要从"我的笔记"中打开
+    
+    // 暂时先跳转到workspace tab，让用户自己查找
+    router.replace({
+      path: route.path,
+      query: {
+        ...route.query,
+        tab: 'workspace'
+      }
+    })
+    
+    // TODO: 实现通过noteId获取notebook和space信息，然后打开笔记编辑器
+    console.log('点击搜索结果:', result)
+  } catch (error) {
+    console.error('打开笔记失败:', error)
+  }
+}
+
+// 执行搜索
 const handleSearch = async () => {
-  if (!searchQuery.value.trim()) return
+  const keyword = searchQuery.value.trim()
+  if (!keyword) return
   
   loading.value = true
   hasSearched.value = true
   
   try {
-    // 调用搜索API
-    // const response = await fetch('/api/search', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ query: searchQuery.value, type: 'all' })
-    // })
-    // const result = await response.json()
-    // searchResults.value = result.data
-    
-    // 模拟数据
-    setTimeout(() => {
-      searchResults.value = [
-        { id: '1', type: '笔记', title: '示例笔记', info: '所属: 示例笔记本 > 示例空间' },
-        { id: '2', type: '笔记本', title: '示例笔记本', info: '所属空间: 示例空间' }
-      ]
+    const userId = userStore.userInfo?.id
+    if (!userId) {
+      console.error('用户未登录')
       loading.value = false
-    }, 500)
+      return
+    }
+    
+    const results = await searchNotes(keyword, userId)
+    searchResults.value = results || []
+    
+    // 更新URL中的关键词
+    router.replace({
+      path: route.path,
+      query: {
+        ...route.query,
+        keyword: keyword
+      }
+    })
   } catch (error) {
     console.error('搜索失败:', error)
+    searchResults.value = []
+  } finally {
     loading.value = false
   }
 }
+
+// 监听initialKeyword变化
+watch(() => props.initialKeyword, (newKeyword) => {
+  if (newKeyword) {
+    searchQuery.value = newKeyword
+    handleSearch()
+  }
+}, { immediate: true })
+
+// 监听路由中的关键词
+watch(() => route.query.keyword, (newKeyword) => {
+  if (newKeyword && newKeyword !== searchQuery.value) {
+    searchQuery.value = newKeyword
+    if (!hasSearched.value) {
+      handleSearch()
+    }
+  }
+})
+
+// 组件挂载时，如果有初始关键词则执行搜索
+onMounted(() => {
+  if (props.initialKeyword) {
+    searchQuery.value = props.initialKeyword
+    handleSearch()
+  } else if (route.query.keyword) {
+    searchQuery.value = route.query.keyword
+    handleSearch()
+  }
+})
 </script>
 
 <style scoped>
 :global(:root) {
-  --brand-primary: #22ee99;
+  --brand-primary: #007FFF;
   --surface-base: #ffffff;
-  --surface-muted: #f7faf8;
-  --line-soft: #e6ece8;
+  --surface-muted: #f6f6f6;
+  --line-soft: #e2e2e2;
   --text-strong: #111c17;
-  --text-secondary: #4b5a53;
-  --text-muted: #90a19b;
+  --text-secondary: #666;
+  --text-muted: #999;
+  --highlight-bg: #fff3cd;
 }
 
 .search-page {
   min-height: 100vh;
-  padding: 60px 24px 100px;
+  padding: 20px 24px 100px;
   background: var(--surface-muted);
-  display: grid;
-  gap: 32px;
 }
 
-.search-panel,
 .results-panel {
-  width: min(960px, 100%);
+  width: min(1200px, 100%);
   margin: 0 auto;
   background: var(--surface-base);
   border: 1px solid var(--line-soft);
-  border-radius: 36px;
-  padding: 36px;
-  box-shadow: 0 25px 80px rgba(17, 28, 23, 0.08);
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.section-label {
-  font-size: 14px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin: 0;
-}
-
-.title-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.panel-header h2 {
-  margin: 8px 0 4px;
-  font-size: 36px;
-  color: var(--text-strong);
-}
-
-.active-indicator {
-  padding: 4px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--brand-primary);
-  color: var(--brand-primary);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.panel-subtext {
-  margin: 0;
-  font-size: 15px;
-  color: var(--text-secondary);
-}
-
-.search-bar {
-  margin-top: 32px;
-  display: flex;
-  gap: 16px;
-  align-items: center;
-  border: 1px solid var(--line-soft);
-  border-radius: 999px;
-  padding: 6px 6px 6px 22px;
-  background: var(--surface-muted);
-}
-
-.search-bar input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  font-size: 16px;
-  color: var(--text-strong);
-  padding: 12px 0;
-}
-
-.search-bar input:focus {
-  outline: none;
-}
-
-.text-action {
-  appearance: none;
-  border: none;
-  background: var(--surface-base);
-  border-radius: 999px;
-  padding: 12px 20px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 15px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease;
-  border: 1px solid transparent;
-}
-
-.text-action:hover,
-.text-action:focus-visible {
-  color: var(--brand-primary);
-  border-color: var(--brand-primary);
-}
-
-.hint-row {
-  margin-top: 18px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  color: var(--text-muted);
-}
-
-.hint-row ul {
-  display: flex;
-  gap: 10px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
-
-.hint-row li {
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px dashed var(--line-soft);
+  border-radius: 8px;
+  padding: 32px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .results-panel {
-  min-height: 420px;
+  min-height: 400px;
+}
+
+.results-header {
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.results-count {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.results-count strong {
+  color: var(--brand-primary);
+  font-weight: 600;
+}
+
+.search-keyword {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.search-keyword strong {
+  color: var(--text-strong);
+  font-weight: 600;
 }
 
 .results-list {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
 }
 
 .result-card {
-  padding: 24px;
-  border-radius: 28px;
+  padding: 20px;
+  border-radius: 8px;
   border: 1px solid var(--line-soft);
   background: var(--surface-base);
-  transition: border-color 0.2s ease, transform 0.2s ease;
+  transition: border-color 0.2s, box-shadow 0.2s;
   cursor: pointer;
 }
 
 .result-card:hover {
   border-color: var(--brand-primary);
-  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 127, 255, 0.1);
 }
 
-.result-head {
+.result-content {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.result-type {
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--brand-primary);
-}
-
-.result-indicator {
-  font-size: 18px;
-  color: var(--text-muted);
+  flex-direction: column;
+  gap: 12px;
 }
 
 .result-title {
-  margin: 0 0 6px;
-  font-size: 20px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
   color: var(--text-strong);
+  line-height: 1.5;
 }
 
-.result-info {
+.result-title :deep(.highlight) {
+  background: var(--highlight-bg);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-weight: 700;
+  color: var(--brand-primary);
+}
+
+.result-summary {
   margin: 0;
   font-size: 14px;
   color: var(--text-secondary);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.result-summary :deep(.highlight) {
+  background: var(--highlight-bg);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-weight: 600;
+  color: var(--brand-primary);
+}
+
+.result-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.meta-left,
+.meta-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.meta-author,
+.meta-time,
+.meta-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.meta-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .state-card {
-  border-radius: 28px;
+  border-radius: 8px;
   border: 1px dashed var(--line-soft);
-  padding: 48px 24px;
+  padding: 60px 24px;
   text-align: center;
   color: var(--text-secondary);
   display: flex;
@@ -342,25 +385,26 @@ const handleSearch = async () => {
 
 .state-card p {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   color: var(--text-strong);
 }
 
 .state-card small {
   color: var(--text-muted);
+  font-size: 13px;
 }
 
 .loader {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  border: 2px solid var(--line-soft);
+  border: 3px solid var(--line-soft);
   border-top-color: var(--brand-primary);
   animation: spin 1s linear infinite;
 }
 
 .placeholder small {
-  max-width: 320px;
+  max-width: 400px;
   line-height: 1.6;
 }
 
@@ -370,32 +414,24 @@ const handleSearch = async () => {
   }
 }
 
-@media (max-width: 640px) {
-  .search-panel,
-  .results-panel {
-    padding: 28px;
-    border-radius: 28px;
-  }
-
-  .search-bar {
-    flex-direction: column;
-    align-items: stretch;
-    border-radius: 24px;
+@media (max-width: 768px) {
+  .search-page {
     padding: 16px;
   }
 
-  .text-action {
-    width: 100%;
-    justify-content: center;
+  .results-panel {
+    padding: 20px;
   }
 
-  .hint-row {
-    flex-wrap: wrap;
-  }
-
-  .title-row {
+  .result-meta {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .meta-left,
+  .meta-right {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 </style>

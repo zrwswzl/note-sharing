@@ -174,3 +174,22 @@ export const getFileUrl = (filename) => {
     return service.post('/noting/notes/files/url', requestBody)
         .then(res => res.data.data);
 };
+
+// =========================================================
+//                        搜索 API
+// =========================================================
+
+/**
+ * [对应后端: POST /api/v1/search/notes]
+ * 搜索笔记 (返回 List<NoteSearchVO>)
+ * @param {string} keyword - 搜索关键词
+ * @param {number} userId - 用户ID
+ */
+export const searchNotes = (keyword, userId) => {
+    const requestBody = {
+        keyword: keyword,
+        userId: userId
+    };
+    return service.post('/search/notes', requestBody)
+        .then(res => res.data.data);
+};

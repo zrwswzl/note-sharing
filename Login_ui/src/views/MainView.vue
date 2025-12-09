@@ -19,12 +19,14 @@
 
       <div class="search-container">
         <input
+            v-model="searchKeyword"
             type="text"
             class="search-input"
             placeholder="编译原理-词法分析器"
             aria-label="搜索框"
+            @keyup.enter="handleSearch"
         />
-        <button class="search-button" type="button" aria-label="搜索">
+        <button class="search-button" type="button" aria-label="搜索" @click="handleSearch">
           <span class="search-icon">🔍</span>
         </button>
       </div>
@@ -81,7 +83,7 @@
       </section>
 
       <section v-else-if="currentTab === 'search'">
-        <SearchView />
+        <SearchView :initialKeyword="searchKeywordFromRoute" />
       </section>
       <section v-else-if="currentTab === 'workspace'">
         <WorkspaceView 
@@ -128,11 +130,15 @@ const tabs = [
   { value: 'workspace', label: '我的笔记', desc: 'WorkspaceView' }
 ]
 
+// 搜索相关状态
+const searchKeyword = ref('')
+const searchKeywordFromRoute = ref('')
+
 // 从 URL 查询参数中读取 tab，如果没有则使用默认值
 const getTabFromRoute = () => {
   const tabFromQuery = route.query.tab
-  // 验证 tab 值是否有效
-  const validTabs = tabs.map(t => t.value)
+  // 验证 tab 值是否有效（包括search tab）
+  const validTabs = [...tabs.map(t => t.value), 'search', 'profile']
   if (tabFromQuery && validTabs.includes(tabFromQuery)) {
     return tabFromQuery
   }
@@ -377,6 +383,34 @@ const goToProfile = () => {
   currentTab.value = 'profile'
 }
 
+// 处理搜索功能
+const handleSearch = () => {
+  const keyword = searchKeyword.value.trim()
+  if (!keyword) return
+  
+  // 切换到搜索tab并传递关键词
+  searchKeywordFromRoute.value = keyword
+  currentTab.value = 'search'
+  
+  // 更新URL参数
+  router.replace({
+    path: route.path,
+    query: {
+      ...route.query,
+      tab: 'search',
+      keyword: keyword
+    }
+  })
+}
+
+// 监听路由中的搜索关键词
+watch(() => route.query.keyword, (newKeyword) => {
+  if (newKeyword && currentTab.value === 'search') {
+    searchKeywordFromRoute.value = newKeyword
+    searchKeyword.value = newKeyword
+  }
+})
+
 // 组件挂载时，确保 URL 中有 tab 参数，并尝试恢复编辑器状态
 onMounted(async () => {
   if (!route.query.tab) {
@@ -384,6 +418,12 @@ onMounted(async () => {
       path: route.path,
       query: { ...route.query, tab: currentTab.value }
     })
+  }
+  
+  // 恢复搜索关键词
+  if (route.query.keyword) {
+    searchKeyword.value = route.query.keyword
+    searchKeywordFromRoute.value = route.query.keyword
   }
   
   // 恢复 workspace tab 的选中空间
