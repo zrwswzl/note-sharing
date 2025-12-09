@@ -32,7 +32,7 @@
       </div>
 
       <div class="header-actions">
-        <button class="ask-button" type="button">
+<button class="ask-button" type="button" @click="handleAskClick">
           <span class="icon">+</span> 提问
         </button>
 
@@ -101,6 +101,9 @@
           :initialTitle="noteDetailTitle"
         />
       </section>
+      <section v-else-if="currentTab === 'circle'">
+        <QACircleView ref="qaRef" />
+      </section>
       <section v-else-if="currentTab === 'workspace'">
         <WorkspaceView 
           :initialWorkspaceId="selectedWorkspaceId"
@@ -122,7 +125,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, nextTick } from 'vue'
 import SearchView from '../components/user/SearchView.vue'
 import WorkspaceView from '../components/user/WorkspaceView.vue'
 import ProfileView from '../components/user/ProfileView.vue'
@@ -132,6 +135,7 @@ import NoteEditorView from '../components/user/NoteEditorView.vue'
 import NoteDetailView from '../components/user/NoteDetailView.vue'
 import HotView from '../components/user/HotView.vue'
 import RecommendView from '../components/user/RecommendView.vue'
+import QACircleView from '../components/user/QACircleView.vue'
 import { useRouter, useRoute } from 'vue-router'
 import service from '../api/request'
 import { useUserStore } from '@/stores/user'
@@ -222,6 +226,7 @@ const selectedWorkspaceId = ref(null); // 当前选中的笔记空间ID（在wor
 const viewingNoteId = ref(null); // 当前查看的笔记详情ID（用于note-detail tab）
 const noteDetailStats = ref(null); // 笔记详情页的统计信息（从搜索结果传递过来）
 const noteDetailTitle = ref(null); // 笔记详情页的标题（从搜索结果传递过来）
+const qaRef = ref(null); // 问答组件实例
 
 // 获取标签名称的辅助函数
 const getTagNameString = async (tag) => {
@@ -431,6 +436,14 @@ const handleWorkspaceSelected = (workspaceId) => {
 // 跳转到个人信息页面
 const goToProfile = () => {
   currentTab.value = 'profile'
+}
+
+// 处理提问按钮，跳转问答并弹出提问框
+const handleAskClick = () => {
+  currentTab.value = 'circle'
+  nextTick(() => {
+    qaRef.value?.openAskDialog?.()
+  })
 }
 
 // 处理搜索功能
