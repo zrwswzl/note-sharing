@@ -243,3 +243,15 @@ export const getHotNotes = () => {
     return service.get('/hot/notes')
         .then(res => res.data.data);
 };
+
+/**
+ * [对应后端: GET /recommend/notes]
+ * 获取推荐笔记列表 (返回 List<NoteSearchVO>)
+ * @param {number} userId - 用户ID
+ * @param {number} topN - 返回条数，默认 10
+ */
+export const getRecommendedNotes = (userId, topN = 10) => {
+    return service.get('/recommend/notes', {
+        params: { userId, topN }
+    }).then(res => res.data.data);
+};

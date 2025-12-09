@@ -88,6 +88,9 @@
           @open-note-detail="handleOpenNoteDetail"
         />
       </section>
+      <section v-else-if="currentTab === 'recommend'">
+        <RecommendView @open-note-detail="handleOpenNoteDetail" />
+      </section>
       <section v-else-if="currentTab === 'hot'">
         <HotView @open-note-detail="handleOpenNoteDetail" />
       </section>
@@ -128,6 +131,7 @@ import CommentsView from '../components/user/CommentsView.vue'
 import NoteEditorView from '../components/user/NoteEditorView.vue'
 import NoteDetailView from '../components/user/NoteDetailView.vue'
 import HotView from '../components/user/HotView.vue'
+import RecommendView from '../components/user/RecommendView.vue'
 import { useRouter, useRoute } from 'vue-router'
 import service from '../api/request'
 import { useUserStore } from '@/stores/user'
