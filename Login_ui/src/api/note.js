@@ -234,3 +234,12 @@ export const searchNotes = (keyword, userId) => {
     return service.post('/search/notes', requestBody)
         .then(res => res.data.data);
 };
+
+/**
+ * [对应后端: GET /hot/notes]
+ * 获取热门笔记榜单 (返回 List<NoteSearchVO>)
+ */
+export const getHotNotes = () => {
+    return service.get('/hot/notes')
+        .then(res => res.data.data);
+};

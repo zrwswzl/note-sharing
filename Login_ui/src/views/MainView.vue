@@ -88,6 +88,9 @@
           @open-note-detail="handleOpenNoteDetail"
         />
       </section>
+      <section v-else-if="currentTab === 'hot'">
+        <HotView @open-note-detail="handleOpenNoteDetail" />
+      </section>
       <section v-else-if="currentTab === 'note-detail' && viewingNoteId">
         <NoteDetailView 
           :noteId="viewingNoteId" 
@@ -124,6 +127,7 @@ import FavoritesView from '../components/user/FavoritesView.vue'
 import CommentsView from '../components/user/CommentsView.vue'
 import NoteEditorView from '../components/user/NoteEditorView.vue'
 import NoteDetailView from '../components/user/NoteDetailView.vue'
+import HotView from '../components/user/HotView.vue'
 import { useRouter, useRoute } from 'vue-router'
 import service from '../api/request'
 import { useUserStore } from '@/stores/user'
@@ -153,7 +157,7 @@ const getTabFromRoute = () => {
   if (tabFromQuery && validTabs.includes(tabFromQuery)) {
     return tabFromQuery
   }
-  return 'recommend' // 默认值
+  return 'hot' // 默认值改为热榜
 }
 
 const currentTab = ref(getTabFromRoute())
@@ -449,6 +453,7 @@ const handleSearch = () => {
 const handleOpenNoteDetail = (payload) => {
   if (payload && payload.noteId) {
     viewingNoteId.value = payload.noteId
+    const sourceTab = payload.fromTab || currentTab.value || 'hot'
     currentTab.value = 'note-detail'
     
     // 保存标题（如果从搜索结果传递过来）
@@ -473,6 +478,7 @@ const handleOpenNoteDetail = (payload) => {
       query: {
         ...route.query,
         tab: 'note-detail',
+        fromTab: sourceTab,
         noteId: payload.noteId,
         title: payload.title || undefined,
         fileType: payload.fileType || undefined

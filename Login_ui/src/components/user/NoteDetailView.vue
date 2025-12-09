@@ -398,13 +398,15 @@ const fetchNoteDetail = async () => {
 
 // 返回上一页
 const goBack = () => {
-  // 如果是从搜索页面跳转过来的，返回到搜索页面
+  // 根据来源 tab 返回对应页面，默认回到热榜
+  const fromTab = route.query.fromTab || 'hot'
   if (route.query.tab === 'note-detail') {
     router.replace({
       path: route.path,
       query: {
         ...route.query,
-        tab: 'search',
+        tab: fromTab,
+        fromTab: undefined,
         noteId: undefined,
         title: undefined,
         fileType: undefined
