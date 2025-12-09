@@ -29,13 +29,6 @@
                   </svg>
                   {{ result.authorName || '未知作者' }}
                 </span>
-                <span class="meta-time">
-                  <svg class="meta-icon" viewBox="0 0 16 16" fill="currentColor">
-                    <path d="M8 3.5a.5.5 0 00-1 0V9a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 8.71V3.5z"/>
-                    <path d="M8 16A8 8 0 108 0a8 8 0 000 16zm8-8A8 8 0 111 8a8 8 0 0115 0z"/>
-                  </svg>
-                  {{ formatTime(result.updatedAt) }}
-                </span>
               </div>
               <div class="meta-right">
                 <span class="meta-stat">
@@ -99,24 +92,6 @@ const searchQuery = ref('')
 const searchResults = ref([])
 const loading = ref(false)
 const hasSearched = ref(false)
-
-// 格式化时间
-const formatTime = (timeStr) => {
-  if (!timeStr) return '未知时间'
-  const date = new Date(timeStr)
-  const now = new Date()
-  const diff = now - date
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-  
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes}分钟前`
-  if (hours < 24) return `${hours}小时前`
-  if (days < 7) return `${days}天前`
-  
-  return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
-}
 
 // 高亮关键词
 const highlightKeyword = (text) => {
