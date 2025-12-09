@@ -54,4 +54,9 @@ public class RabbitConfig {
     public Queue userBehaviorQueue() {
         return new Queue(USER_BEHAVIOR_QUEUE, true); // durable queue
     }
+
+    @Bean
+    public Queue questionEsQueue() {
+        return new Queue("question.es.queue", true); // durable queue
+    }
 }

@@ -8,7 +8,6 @@ import com.project.login.model.event.EsNoteEvent;
 import com.project.login.model.event.NoteActionType;
 import com.project.login.model.vo.NoteVO;
 import com.project.login.service.minio.MinioService;
-import com.project.login.service.tag.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -30,13 +29,11 @@ public class NoteService {
     private final NoteStatsMapper noteStatsMapper;
     private final UserMapper userMapper;
     private final MinioService minioservice;
-    private final TagService tagService;
     private final NoteEventPublisher eventPublisher;
     private final ContentSummaryService contentSummaryService;
 
     @Qualifier("noteConvert")
     private final NoteConvert convert;
-    private final TagMapper tagMapper;
 
     private String getAuthorName(Long id) {
         Long bookId = noteMapper.selectNotebookIdByNoteId(id);
@@ -239,6 +236,13 @@ public class NoteService {
     @Transactional(readOnly = true)
     public String getFileUrl(NoteFileUrlDTO dto) {
         String url = minioservice.getFileUrl(dto.getFilename());
+        return url;
+    }
+
+    @Transactional(readOnly = true)
+    public String getFileUrlByNoteId(Long noteId) {
+        String fileName = noteMapper.selectFileNameByNoteId(noteId);
+        String url = minioservice.getFileUrl(fileName);
         return url;
     }
 
