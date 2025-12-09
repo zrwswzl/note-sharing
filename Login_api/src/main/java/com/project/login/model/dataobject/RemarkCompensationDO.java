@@ -1,0 +1,52 @@
+package com.project.login.model.dataobject;
+
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Field;
+
+import java.time.LocalDateTime;
+
+public class RemarkCompensationDO {
+    @Id
+    @Field("_id") // MongoDB 中的主键字段为 id
+    private String _id; // MongoDB 文档主键，对应 id
+
+    @Field("note_id") // 将 noteId 映射为 note_id
+    @Indexed
+    private Long noteId; // 属于哪篇笔记
+
+    @Field("user_id") // 将 userId 映射为 user_id
+    private Long userId; // 评论发布者
+
+    @Field("content") // 映射为 content
+    private String content; // 评论内容
+
+    @Field("created_at") // 映射为 created_at
+    @CreatedDate
+    private LocalDateTime createdAt; // 创建时间
+
+    @Field("parent_id") // 映射为 parent_id
+    private String parentId; // 上一级评论（楼中楼）
+
+    @Field("is_receive") // 映射为 is_receive
+    private Boolean isReceive; // 是否是回复
+
+    @Field("receive_to_remark_id") // 映射为 receive_to_remark_id
+    private String receiveToRemarkId; // 回复哪条评论
+
+    @Field("likes") // 映射为 likes
+    private Long likes; // 点赞数
+
+    @Field("version")
+    private Long version;
+
+    @Field("retry_count")
+    private Long retryCount;
+
+    @Field("last_activity_at")
+    private LocalDateTime lastActivityAt;
+
+    @Field("status")
+    private String status;
+}
