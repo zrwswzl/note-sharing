@@ -118,10 +118,12 @@ const handleResultClick = async (result) => {
   
   try {
     // 发出事件通知父组件（MainView）显示笔记详情页，传递统计信息
+    const fileType = result.fileType
+
     emit('open-note-detail', {
       noteId: result.noteId,
       title: result.title || '无标题',
-      fileType: result.fileType || 'md', // 默认markdown类型
+      fileType, // 传后端返回的类型，未返回时让详情页自行判断
       // 传递统计信息
       authorName: result.authorName,
       viewCount: result.viewCount,
@@ -138,7 +140,7 @@ const handleResultClick = async (result) => {
         tab: 'note-detail',
         noteId: result.noteId,
         title: result.title || undefined,
-        fileType: result.fileType || undefined
+        fileType: fileType || undefined
       }
     })
   } catch (error) {
