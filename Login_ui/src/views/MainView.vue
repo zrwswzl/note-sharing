@@ -92,6 +92,7 @@
         <NoteDetailView 
           :noteId="viewingNoteId" 
           :initialStats="noteDetailStats"
+          :initialTitle="noteDetailTitle"
         />
       </section>
       <section v-else-if="currentTab === 'workspace'">
@@ -158,12 +159,18 @@ const getTabFromRoute = () => {
 const currentTab = ref(getTabFromRoute())
 
 // 当 currentTab 改变时，同步更新 URL 查询参数
-watch(currentTab, (newTab) => {
+watch(currentTab, (newTab, oldTab) => {
   if (route.query.tab !== newTab) {
     router.replace({
       path: route.path,
       query: { ...route.query, tab: newTab }
     })
+  }
+  // 当切换离开 note-detail tab 时，清除笔记详情相关状态
+  if (oldTab === 'note-detail' && newTab !== 'note-detail') {
+    viewingNoteId.value = null
+    noteDetailStats.value = null
+    noteDetailTitle.value = null
   }
 })
 
@@ -206,6 +213,7 @@ const editingNoteId = ref(null); // 当前选中的笔记ID
 const selectedWorkspaceId = ref(null); // 当前选中的笔记空间ID（在workspace tab时）
 const viewingNoteId = ref(null); // 当前查看的笔记详情ID（用于note-detail tab）
 const noteDetailStats = ref(null); // 笔记详情页的统计信息（从搜索结果传递过来）
+const noteDetailTitle = ref(null); // 笔记详情页的标题（从搜索结果传递过来）
 
 // 获取标签名称的辅助函数
 const getTagNameString = async (tag) => {
@@ -389,6 +397,8 @@ const restoreNoteDetailFromRoute = () => {
       const noteId = Number(noteIdFromQuery)
       if (!isNaN(noteId) && noteId > 0) {
         viewingNoteId.value = noteId
+        // 从 URL 恢复标题
+        noteDetailTitle.value = route.query.title || null
       }
     }
   }
@@ -440,6 +450,9 @@ const handleOpenNoteDetail = (payload) => {
   if (payload && payload.noteId) {
     viewingNoteId.value = payload.noteId
     currentTab.value = 'note-detail'
+    
+    // 保存标题（如果从搜索结果传递过来）
+    noteDetailTitle.value = payload.title || null
     
     // 保存统计信息（如果从搜索结果传递过来）
     if (payload.authorName !== undefined || payload.viewCount !== undefined) {

@@ -124,6 +124,10 @@ const props = defineProps({
   initialStats: {
     type: Object,
     default: null
+  },
+  initialTitle: {
+    type: String,
+    default: null
   }
 })
 
@@ -233,9 +237,9 @@ const fetchNoteDetail = async () => {
       fileType = 'md'
     }
 
-    // 构建笔记详情对象（从路由参数或搜索结果中获取标题）
+    // 构建笔记详情对象（优先使用从搜索结果传递过来的标题，然后是路由参数，最后是默认值）
     noteDetail.value = {
-      title: route.query.title || '无标题笔记',
+      title: props.initialTitle || route.query.title || '无标题笔记',
       fileType: route.query.fileType || fileType,
       noteId: noteId
     }
@@ -319,6 +323,13 @@ watch(() => props.initialStats, (newStats) => {
     }
   }
 }, { immediate: true, deep: true })
+
+// 监听initialTitle变化，如果标题更新了，也要更新显示
+watch(() => props.initialTitle, (newTitle) => {
+  if (newTitle && noteDetail.value) {
+    noteDetail.value.title = newTitle
+  }
+}, { immediate: true })
 
 onMounted(() => {
   if (props.noteId) {
