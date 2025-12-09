@@ -10,98 +10,132 @@
       <button class="back-button" @click="goBack">返回</button>
     </div>
 
-    <div v-else-if="noteDetail" class="detail-container">
-      <!-- 返回按钮 -->
-      <div class="back-header">
-        <button class="back-link-button" @click="goBack">
-          <svg class="back-icon" viewBox="0 0 16 16" fill="currentColor">
-            <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+    <div v-else-if="noteDetail" class="detail-layout">
+      <div class="detail-container">
+        <!-- 返回按钮 -->
+        <div class="back-header">
+          <button class="back-link-button" @click="goBack">
+            <svg class="back-icon" viewBox="0 0 16 16" fill="currentColor">
+              <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+            </svg>
+            <span>返回</span>
+          </button>
+        </div>
+        
+        <!-- 头部：标题 -->
+        <header class="detail-header">
+          <h1 class="note-title">{{ noteDetail.title || '无标题' }}</h1>
+        </header>
+
+        <!-- 作者和统计信息 -->
+        <div class="note-meta-section">
+          <div class="author-info">
+            <svg class="author-icon" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm2-3a2 2 0 11-4 0 2 2 0 014 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
+            </svg>
+            <span class="author-name">{{ stats.authorName || '未知作者' }}</span>
+          </div>
+          <div class="stats-info">
+            <span class="stat-item">
+              <svg class="stat-icon" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 4a.5.5 0 01.5.5v3h3a.5.5 0 010 1h-3v3a.5.5 0 01-1 0v-3h-3a.5.5 0 010-1h3v-3A.5.5 0 018 4z"/>
+              </svg>
+              {{ stats.views || 0 }} 阅读
+            </span>
+            <span class="stat-item">
+              <svg class="stat-icon" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 15A7 7 0 118 1a7 7 0 010 14zm0 1A8 8 0 108 0a8 8 0 000 16z"/>
+                <path d="M8 4a.5.5 0 00-.5.5v3h-3a.5.5 0 000 1h3v3a.5.5 0 001 0v-3h3a.5.5 0 000-1h-3v-3A.5.5 0 008 4z"/>
+              </svg>
+              {{ stats.likes || 0 }} 点赞
+            </span>
+            <span class="stat-item">
+              <svg class="stat-icon" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M2 2v13.5a.5.5 0 00.74.439L8 13.069l5.26 2.87A.5.5 0 0014 15.5V2a2 2 0 00-2-2H4a2 2 0 00-2 2z"/>
+              </svg>
+              {{ stats.favorites || 0 }} 收藏
+            </span>
+            <span class="stat-item">
+              <svg class="stat-icon" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M2.5 1A1.5 1.5 0 001 2.5v11A1.5 1.5 0 002.5 15h6.086a1.5 1.5 0 001.06-.44l4.915-4.914A1.5 1.5 0 0015 7.586V2.5A1.5 1.5 0 0013.5 1h-11zM2 2.5a.5.5 0 01.5-.5h11a.5.5 0 01.5.5v7.086a.5.5 0 01-.146.353l-4.915 4.915a.5.5 0 01-.353.146H2.5a.5.5 0 01-.5-.5v-11z"/>
+                <path d="M5.5 6a.5.5 0 000 1h5a.5.5 0 000-1h-5zM5 8.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zm0 2a.5.5 0 01.5-.5h2a.5.5 0 010 1h-2a.5.5 0 01-.5-.5z"/>
+              </svg>
+              {{ stats.comments || 0 }} 评论
+            </span>
+          </div>
+        </div>
+
+        <!-- 主题部分：笔记内容（不可编辑） -->
+        <div class="note-content-section">
+          <div v-if="contentLoading" class="content-loading">
+            <div class="loader"></div>
+            <p>加载笔记内容...</p>
+          </div>
+          <div v-else-if="noteDetail.fileType === 'pdf'" class="pdf-preview-container">
+            <VuePdfEmbed
+              v-if="fileUrl"
+              :source="fileUrl"
+              class="pdf-viewer"
+              :width="800"
+            />
+            <p v-else class="no-content">无法加载PDF文件</p>
+          </div>
+          <div v-else-if="noteDetail.fileType === 'md'" class="markdown-content">
+            <div 
+              v-if="fileUrl && markdownContent" 
+              class="markdown-body"
+              v-html="markdownContent"
+            ></div>
+            <p v-else class="no-content">无法加载笔记内容</p>
+          </div>
+          <div v-else class="no-content">
+            <p>不支持的文件类型：{{ noteDetail.fileType }}</p>
+          </div>
+        </div>
+
+        <!-- 尾部：评论部分（预留展示栏） -->
+        <div class="comments-section">
+          <div class="comments-header">
+            <h2 class="comments-title">评论</h2>
+            <span class="comments-count">({{ stats.comments || 0 }})</span>
+          </div>
+          <div class="comments-placeholder">
+            <p class="placeholder-text">评论功能即将上线，敬请期待...</p>
+          </div>
+        </div>
+      </div>
+
+      <aside class="action-sidebar">
+        <button
+          class="action-button"
+          :class="{ active: isLiked }"
+          :disabled="actionLoading.likes"
+          @click="handleToggleStat('likes')"
+        >
+          <svg class="action-icon" viewBox="0 0 16 16" fill="currentColor">
+            <path d="m8 2.748-.717-.737C5.6.281 2.514.878 1.4 3.053c-.523 1.023-.641 2.5.314 4.385C2.972 9.59 5.614 12.368 8 14.25c2.386-1.882 5.028-4.659 6.286-6.813.955-1.886.838-3.362.314-4.385C13.486.878 10.4.28 8.717 2.01z"/>
+            <path d="M8 15C-7.333 4.868 3.279-3.04 7.824 1.143c.06.055.119.112.176.171a3.12 3.12 0 0 1 .176-.17C12.72-3.042 23.333 4.867 8 15z"/>
           </svg>
-          <span>返回</span>
+          <div class="action-text">
+            <span class="action-label">喜爱</span>
+            <span class="action-count">{{ stats.likes || 0 }}</span>
+          </div>
         </button>
-      </div>
-      
-      <!-- 头部：标题 -->
-      <header class="detail-header">
-        <h1 class="note-title">{{ noteDetail.title || '无标题' }}</h1>
-      </header>
-
-      <!-- 作者和统计信息 -->
-      <div class="note-meta-section">
-        <div class="author-info">
-          <svg class="author-icon" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm2-3a2 2 0 11-4 0 2 2 0 014 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
+        <button
+          class="action-button"
+          :class="{ active: isFavorited }"
+          :disabled="actionLoading.favorites"
+          @click="handleToggleStat('favorites')"
+        >
+          <svg class="action-icon" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M2 2v12.5a.5.5 0 00.76.43L8 12.101l5.24 2.83A.5.5 0 0014 14.5V2a2 2 0 00-2-2H4a2 2 0 00-2 2z"/>
           </svg>
-          <span class="author-name">{{ stats.authorName || '未知作者' }}</span>
-        </div>
-        <div class="stats-info">
-          <span class="stat-item">
-            <svg class="stat-icon" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 4a.5.5 0 01.5.5v3h3a.5.5 0 010 1h-3v3a.5.5 0 01-1 0v-3h-3a.5.5 0 010-1h3v-3A.5.5 0 018 4z"/>
-            </svg>
-            {{ stats.views || 0 }} 阅读
-          </span>
-          <span class="stat-item">
-            <svg class="stat-icon" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 15A7 7 0 118 1a7 7 0 010 14zm0 1A8 8 0 108 0a8 8 0 000 16z"/>
-              <path d="M8 4a.5.5 0 00-.5.5v3h-3a.5.5 0 000 1h3v3a.5.5 0 001 0v-3h3a.5.5 0 000-1h-3v-3A.5.5 0 008 4z"/>
-            </svg>
-            {{ stats.likes || 0 }} 点赞
-          </span>
-          <span class="stat-item">
-            <svg class="stat-icon" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M2 2v13.5a.5.5 0 00.74.439L8 13.069l5.26 2.87A.5.5 0 0014 15.5V2a2 2 0 00-2-2H4a2 2 0 00-2 2z"/>
-            </svg>
-            {{ stats.favorites || 0 }} 收藏
-          </span>
-          <span class="stat-item">
-            <svg class="stat-icon" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M2.5 1A1.5 1.5 0 001 2.5v11A1.5 1.5 0 002.5 15h6.086a1.5 1.5 0 001.06-.44l4.915-4.914A1.5 1.5 0 0015 7.586V2.5A1.5 1.5 0 0013.5 1h-11zM2 2.5a.5.5 0 01.5-.5h11a.5.5 0 01.5.5v7.086a.5.5 0 01-.146.353l-4.915 4.915a.5.5 0 01-.353.146H2.5a.5.5 0 01-.5-.5v-11z"/>
-              <path d="M5.5 6a.5.5 0 000 1h5a.5.5 0 000-1h-5zM5 8.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zm0 2a.5.5 0 01.5-.5h2a.5.5 0 010 1h-2a.5.5 0 01-.5-.5z"/>
-            </svg>
-            {{ stats.comments || 0 }} 评论
-          </span>
-        </div>
-      </div>
-
-      <!-- 主题部分：笔记内容（不可编辑） -->
-      <div class="note-content-section">
-        <div v-if="contentLoading" class="content-loading">
-          <div class="loader"></div>
-          <p>加载笔记内容...</p>
-        </div>
-        <div v-else-if="noteDetail.fileType === 'pdf'" class="pdf-preview-container">
-          <VuePdfEmbed
-            v-if="fileUrl"
-            :source="fileUrl"
-            class="pdf-viewer"
-            :width="800"
-          />
-          <p v-else class="no-content">无法加载PDF文件</p>
-        </div>
-        <div v-else-if="noteDetail.fileType === 'md'" class="markdown-content">
-          <div 
-            v-if="fileUrl && markdownContent" 
-            class="markdown-body"
-            v-html="markdownContent"
-          ></div>
-          <p v-else class="no-content">无法加载笔记内容</p>
-        </div>
-        <div v-else class="no-content">
-          <p>不支持的文件类型：{{ noteDetail.fileType }}</p>
-        </div>
-      </div>
-
-      <!-- 尾部：评论部分（预留展示栏） -->
-      <div class="comments-section">
-        <div class="comments-header">
-          <h2 class="comments-title">评论</h2>
-          <span class="comments-count">({{ stats.comments || 0 }})</span>
-        </div>
-        <div class="comments-placeholder">
-          <p class="placeholder-text">评论功能即将上线，敬请期待...</p>
-        </div>
-      </div>
+          <div class="action-text">
+            <span class="action-label">收藏</span>
+            <span class="action-count">{{ stats.favorites || 0 }}</span>
+          </div>
+        </button>
+      </aside>
     </div>
   </div>
 </template>
@@ -109,12 +143,14 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getFileUrlByNoteId, getNoteStats } from '@/api/note'
+import { getFileUrlByNoteId, getNoteStats, changeNoteStat } from '@/api/note'
+import { useUserStore } from '@/stores/user'
 import VuePdfEmbed from 'vue-pdf-embed'
 import MarkdownIt from 'markdown-it'
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 
 const props = defineProps({
   noteId: {
@@ -151,6 +187,12 @@ const stats = ref(
     comments: 0
   }
 )
+const isLiked = ref(false)
+const isFavorited = ref(false)
+const actionLoading = ref({
+  likes: false,
+  favorites: false
+})
 const fileUrl = ref(null)
 const markdownContent = ref('')
 
@@ -162,10 +204,92 @@ const mdParser = new MarkdownIt({
   typographer: true
 })
 
+const ACTION_KEY_PREFIX = 'note_stat_action'
+
+const getCurrentUserId = () => {
+  const storeId = userStore.userInfo?.id
+  if (storeId) return storeId
+  try {
+    return JSON.parse(localStorage.getItem('userInfo') || '{}')?.id || null
+  } catch (err) {
+    return null
+  }
+}
+
+const getActionStorageKey = (field) => {
+  const userId = getCurrentUserId()
+  const noteId = noteDetail.value?.noteId || props.noteId
+  if (!userId || !noteId) return null
+  return `${ACTION_KEY_PREFIX}:${field}:${noteId}:${userId}`
+}
+
+const restoreActionState = () => {
+  const likeKey = getActionStorageKey('likes')
+  const favoriteKey = getActionStorageKey('favorites')
+  isLiked.value = likeKey ? localStorage.getItem(likeKey) === '1' : false
+  isFavorited.value = favoriteKey ? localStorage.getItem(favoriteKey) === '1' : false
+}
+
+const persistActionState = (field, active) => {
+  const key = getActionStorageKey(field)
+  if (!key) return
+  if (active) {
+    localStorage.setItem(key, '1')
+  } else {
+    localStorage.removeItem(key)
+  }
+}
+
+const setActionLoading = (field, value) => {
+  actionLoading.value = {
+    ...actionLoading.value,
+    [field]: value
+  }
+}
+
+const updateStatsFromResponse = (statsData) => {
+  if (!statsData) return
+  stats.value = {
+    authorName: statsData.authorName || stats.value.authorName || '未知作者',
+    views: statsData.views ?? stats.value.views ?? 0,
+    likes: statsData.likes ?? stats.value.likes ?? 0,
+    favorites: statsData.favorites ?? stats.value.favorites ?? 0,
+    comments: statsData.comments ?? stats.value.comments ?? 0
+  }
+}
+
+const handleToggleStat = async (field) => {
+  if (!noteDetail.value?.noteId) return
+  const userId = getCurrentUserId()
+  if (!userId) {
+    console.warn('用户未登录，无法进行操作')
+    return
+  }
+
+  const flagRef = field === 'likes' ? isLiked : isFavorited
+  if (actionLoading.value[field]) return
+
+  setActionLoading(field, true)
+  const delta = flagRef.value ? -1 : 1
+
+  try {
+    const updated = await changeNoteStat(noteDetail.value.noteId, userId, field, delta)
+    updateStatsFromResponse(updated)
+    flagRef.value = delta > 0
+    persistActionState(field, flagRef.value)
+  } catch (err) {
+    console.error('更新笔记统计失败:', err)
+  } finally {
+    setActionLoading(field, false)
+  }
+}
+
 // 获取笔记详情和统计信息
 const fetchNoteDetail = async () => {
   loading.value = true
   error.value = null
+  isLiked.value = false
+  isFavorited.value = false
 
   try {
     // 确保noteId是有效的数字
@@ -178,26 +302,12 @@ const fetchNoteDetail = async () => {
 
     // 优先使用从搜索结果传递过来的统计信息
     if (props.initialStats) {
-      stats.value = {
-        authorName: props.initialStats.authorName || '未知作者',
-        views: props.initialStats.views || 0,
-        likes: props.initialStats.likes || 0,
-        favorites: props.initialStats.favorites || 0,
-        comments: props.initialStats.comments || 0
-      }
+      updateStatsFromResponse(props.initialStats)
     } else {
       // 如果没有传递统计信息，则从API获取
       try {
         const statsData = await getNoteStats(noteId)
-        if (statsData) {
-          stats.value = {
-            authorName: statsData.authorName || '未知作者',
-            views: statsData.views || 0,
-            likes: statsData.likes || 0,
-            favorites: statsData.favorites || 0,
-            comments: statsData.comments || 0
-          }
-        }
+        updateStatsFromResponse(statsData)
       } catch (statsError) {
         console.error('获取统计信息失败:', statsError)
         // 统计信息获取失败不影响主要内容显示
@@ -243,6 +353,7 @@ const fetchNoteDetail = async () => {
       fileType: route.query.fileType || fileType,
       noteId: noteId
     }
+    restoreActionState()
 
     // 如果是Markdown文件，获取内容并转换为HTML
     if (noteDetail.value.fileType === 'md') {
@@ -353,15 +464,26 @@ onMounted(() => {
   min-height: 100vh;
   background: var(--surface-muted);
   padding: 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.detail-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+  max-width: 1200px;
 }
 
 .detail-container {
   max-width: 900px;
-  margin: 0 auto;
+  margin: 0;
   background: var(--surface-base);
   border-radius: 8px;
   padding: 40px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  flex: 1;
 }
 
 /* 返回按钮区域 */
@@ -628,6 +750,99 @@ onMounted(() => {
   margin: 0;
   color: var(--text-muted);
   font-size: 15px;
+}
+
+.action-sidebar {
+  position: sticky;
+  top: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 150px;
+}
+
+.action-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-base);
+  color: var(--text-strong);
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, transform 0.1s;
+}
+
+.action-button:hover {
+  border-color: var(--brand-primary);
+  transform: translateY(-1px);
+}
+
+.action-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.action-button.active {
+  background: var(--brand-primary);
+  color: white;
+  border-color: var(--brand-primary);
+}
+
+.action-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.action-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: 1.2;
+}
+
+.action-label {
+  font-size: 14px;
+}
+
+.action-count {
+  font-size: 13px;
+  color: var(--brand-primary);
+}
+
+.action-button.active .action-count,
+.action-button.active .action-label {
+  color: white;
+}
+
+.action-button.active .action-icon {
+  color: white;
+}
+
+@media (max-width: 1024px) {
+  .detail-layout {
+    flex-direction: column;
+  }
+
+  .action-sidebar {
+    position: static;
+    width: 100%;
+    flex-direction: row;
+  }
+
+  .action-button {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .action-text {
+    align-items: center;
+  }
 }
 
 /* 加载和错误状态 */

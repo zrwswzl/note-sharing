@@ -79,9 +79,8 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { searchNotes } from '@/api/note'
+import { searchNotes, changeNoteStat } from '@/api/note'
 import { useUserStore } from '@/stores/user'
-import service from '@/api/request'
 
 const props = defineProps({
   initialKeyword: {
@@ -100,6 +99,35 @@ const searchQuery = ref('')
 const searchResults = ref([])
 const loading = ref(false)
 const hasSearched = ref(false)
+const VIEW_CACHE_PREFIX = 'note_view_ts'
+
+const getViewCacheKey = (noteId, userId) => {
+  if (!noteId || !userId) return null
+  return `${VIEW_CACHE_PREFIX}:${noteId}:${userId}`
+}
+
+const canIncreaseView = (noteId, userId) => {
+  const key = getViewCacheKey(noteId, userId)
+  if (!key) return false
+  try {
+    const ts = Number(localStorage.getItem(key) || 0)
+    if (!ts) return true
+    return Date.now() - ts >= 5 * 60 * 1000 // 5分钟节流
+  } catch (err) {
+    console.warn('读取本地阅读缓存失败:', err)
+    return true
+  }
+}
+
+const markViewIncreased = (noteId, userId) => {
+  const key = getViewCacheKey(noteId, userId)
+  if (!key) return
+  try {
+    localStorage.setItem(key, String(Date.now()))
+  } catch (err) {
+    console.warn('写入本地阅读缓存失败:', err)
+  }
+}
 
 // 高亮关键词
 const highlightKeyword = (text) => {
@@ -117,6 +145,41 @@ const handleResultClick = async (result) => {
   }
   
   try {
+    const userId = userStore.userInfo?.id
+    let latestStats = null
+
+    if (userId) {
+      try {
+        if (canIncreaseView(result.noteId, userId)) {
+          latestStats = await changeNoteStat(result.noteId, userId, 'views', 1)
+          markViewIncreased(result.noteId, userId)
+          if (latestStats?.views !== undefined) {
+            result.viewCount = latestStats.views
+            result.likeCount = latestStats.likes ?? result.likeCount
+            result.favoriteCount = latestStats.favorites ?? result.favoriteCount
+            result.commentCount = latestStats.comments ?? result.commentCount
+            result.authorName = latestStats.authorName || result.authorName
+          }
+        } else {
+          // 节流命中，不再增加阅读量
+          latestStats = null
+        }
+      } catch (err) {
+        console.error('增加阅读量失败:', err)
+        result.viewCount = (result.viewCount || 0) + 1
+      }
+    } else {
+      console.warn('用户未登录，跳过阅读量统计')
+    }
+
+    const statsPayload = {
+      authorName: latestStats?.authorName ?? result.authorName,
+      viewCount: latestStats?.views ?? result.viewCount ?? 0,
+      likeCount: latestStats?.likes ?? result.likeCount ?? 0,
+      favoriteCount: latestStats?.favorites ?? result.favoriteCount ?? 0,
+      commentCount: latestStats?.comments ?? result.commentCount ?? 0
+    }
+
     // 发出事件通知父组件（MainView）显示笔记详情页，传递统计信息
     const fileType = result.fileType
 
@@ -125,11 +188,11 @@ const handleResultClick = async (result) => {
       title: result.title || '无标题',
       fileType, // 传后端返回的类型，未返回时让详情页自行判断
       // 传递统计信息
-      authorName: result.authorName,
-      viewCount: result.viewCount,
-      likeCount: result.likeCount,
-      favoriteCount: result.favoriteCount,
-      commentCount: result.commentCount
+      authorName: statsPayload.authorName,
+      viewCount: statsPayload.viewCount,
+      likeCount: statsPayload.likeCount,
+      favoriteCount: statsPayload.favoriteCount,
+      commentCount: statsPayload.commentCount
     })
     
     // 更新URL参数，记录当前查看的笔记

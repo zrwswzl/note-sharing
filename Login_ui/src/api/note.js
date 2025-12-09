@@ -193,13 +193,27 @@ export const getFileUrlByNoteId = (noteId) => {
 // =========================================================
 
 /**
- * [对应后端: GET /note-stats/{noteId}]
+ * [对应后端: GET /noting/note-stats/{noteId}]
  * 获取笔记统计信息 (返回 NoteStatsVO)
  * @param {number} noteId - 笔记ID
  */
 export const getNoteStats = (noteId) => {
-    return service.get(`/note-stats/${noteId}`)
+    return service.get(`/noting/note-stats/${noteId}`)
         .then(res => res.data.data);
+};
+
+/**
+ * [对应后端: POST /noting/note-stats/change]
+ * 变更笔记统计字段（views/likes/favorites/comments）
+ * @param {number} noteId - 笔记ID
+ * @param {number} userId - 用户ID
+ * @param {string} field - 字段名：views | likes | favorites | comments
+ * @param {number} delta - 变化值，默认+1，可传-1做撤销
+ */
+export const changeNoteStat = (noteId, userId, field, delta = 1) => {
+    return service.post('/noting/note-stats/change', null, {
+        params: { noteId, userId, field, delta }
+    }).then(res => res.data.data);
 };
 
 // =========================================================
