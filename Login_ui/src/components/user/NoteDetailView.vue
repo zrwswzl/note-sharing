@@ -88,8 +88,11 @@
             ></div>
             <p v-else class="no-content">无法加载笔记内容</p>
           </div>
+          <div v-else-if="!noteDetail.fileType" class="no-content">
+            <p>不支持的文件类型，仅支持 md 或 pdf 格式</p>
+          </div>
           <div v-else class="no-content">
-            <p>不支持的文件类型：{{ noteDetail.fileType }}</p>
+            <p>不支持的文件类型：{{ noteDetail.fileType }}，仅支持 md 或 pdf 格式</p>
           </div>
         </div>
 
@@ -321,36 +324,45 @@ const fetchNoteDetail = async () => {
       }
     }
 
-    // 获取文件URL
-    let url
+    // 获取笔记信息（包含fileType和url）
+    let noteInfo
     try {
-      url = await getFileUrlByNoteId(noteId)
-      if (!url) {
-        throw new Error('无法获取笔记文件URL')
+      noteInfo = await getFileUrlByNoteId(noteId)
+      if (!noteInfo || !noteInfo.url) {
+        throw new Error('无法获取笔记信息')
       }
     } catch (urlError) {
-      console.error('获取文件URL失败:', urlError)
+      console.error('获取笔记信息失败:', urlError)
       if (urlError.response) {
         console.error('响应数据:', urlError.response.data)
         console.error('响应状态:', urlError.response.status)
       }
-      throw new Error(`无法获取笔记文件URL: ${urlError.message || '未知错误'}`)
+      throw new Error(`无法获取笔记信息: ${urlError.message || '未知错误'}`)
     }
 
-    fileUrl.value = url
+    // 从后端返回的数据中获取fileType和url
+    const fileType = noteInfo.fileType || 'md'
+    const urlString = noteInfo.url || ''
 
-    // 从URL判断文件类型（根据文件扩展名）
-    let fileType = 'md' // 默认类型
-    if (url.toLowerCase().endsWith('.pdf')) {
-      fileType = 'pdf'
-    } else if (url.toLowerCase().endsWith('.md') || url.toLowerCase().endsWith('.markdown')) {
-      fileType = 'md'
+    // 只支持md和pdf格式，如果不是这两种格式，设置fileType为null，在模板中显示错误信息
+    if (fileType !== 'md' && fileType !== 'pdf') {
+      console.warn(`不支持的文件类型: ${fileType}，仅支持 md 或 pdf 格式`)
+      noteDetail.value = {
+        title: noteInfo.title || props.initialTitle || route.query.title || '无标题笔记',
+        fileType: null, // 设置为null，模板中会显示不支持的文件类型提示
+        noteId: noteId
+      }
+      restoreActionState()
+      loading.value = false
+      return // 提前返回，不加载文件内容，但保持标题、作者、点赞、收藏等功能正常
     }
 
-    // 构建笔记详情对象（优先使用从搜索结果传递过来的标题，然后是路由参数，最后是默认值）
+    fileUrl.value = urlString
+
+    // 构建笔记详情对象（优先使用后端返回的标题，然后是搜索结果传递的标题，最后是路由参数）
     noteDetail.value = {
-      title: props.initialTitle || route.query.title || '无标题笔记',
-      fileType: route.query.fileType || fileType,
+      title: noteInfo.title || props.initialTitle || route.query.title || '无标题笔记',
+      fileType: fileType,
       noteId: noteId
     }
     restoreActionState()

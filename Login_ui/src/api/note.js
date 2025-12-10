@@ -177,8 +177,9 @@ export const getFileUrl = (filename) => {
 
 /**
  * [对应后端: POST /noting/notes/files/id_url]
- * 通过笔记ID获取文件访问 URL (返回 String)
+ * 通过笔记ID获取笔记信息 (返回 NoteShowVO 对象，包含 id, title, url, fileType 等)
  * @param {number} noteId - 笔记ID
+ * @returns {Promise<{id: number, title: string, url: string, fileType: string, notebookId: number, createdAt: string, updatedAt: string}>}
  */
 export const getFileUrlByNoteId = (noteId) => {
     // 后端使用 @RequestParam，所以使用查询参数
