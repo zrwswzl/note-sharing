@@ -46,12 +46,12 @@
                   </svg>
                   {{ item.authorName || '未知作者' }}
                 </span>
-                <span v-if="item.updatedAt" class="meta-time">
+                <span class="meta-time">
                   <svg class="meta-icon" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M8 3.5a.5.5 0 00-1 0V9a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 8.71V3.5z"/>
                     <path d="M8 16A8 8 0 108 0a8 8 0 000 16zm7-8A7 7 0 111 8a7 7 0 0114 0z"/>
                   </svg>
-                  {{ formatTime(item.updatedAt) }}
+                  {{ getDisplayTime(item) }}
                 </span>
               </div>
               <div class="meta-right">
@@ -98,7 +98,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getRecommendedNotes, changeNoteStat } from '@/api/note'
+import { getRecommendedNotes, changeNoteStat, getFileUrlByNoteId } from '@/api/note'
 import { useUserStore } from '@/stores/user'
 import { formatTime } from '@/utils/time'
 
@@ -152,6 +152,56 @@ const markViewIncreased = (noteId, userId) => {
   }
 }
 
+// 获取显示时间
+const getDisplayTime = (item) => {
+  if (!item) return '时间未知'
+  // 优先使用已获取的时间字段
+  const time = item.updatedAt || item.updated_at || item.createdAt || item.created_at
+  if (time) {
+    return formatTime(time) || '时间未知'
+  }
+  // 如果时间字段为空，返回加载中状态（会在fetchNoteTimes中异步更新）
+  return item._timeLoading ? '加载中...' : '时间未知'
+}
+
+// 批量获取笔记时间信息
+const fetchNoteTimes = async (items) => {
+  if (!items || items.length === 0) return
+  
+  // 找出没有时间的笔记
+  const notesWithoutTime = items.filter(item => 
+    item.noteId && 
+    !item.updatedAt && 
+    !item.updated_at && 
+    !item.createdAt && 
+    !item.created_at &&
+    !item._timeLoading
+  )
+  
+  if (notesWithoutTime.length === 0) return
+  
+  // 标记为加载中
+  notesWithoutTime.forEach(item => { item._timeLoading = true })
+  
+  // 批量获取时间信息
+  const promises = notesWithoutTime.map(async (item) => {
+    try {
+      const noteInfo = await getFileUrlByNoteId(item.noteId)
+      if (noteInfo) {
+        // 使用updatedAt，如果没有则使用createdAt
+        item.updatedAt = noteInfo.updatedAt || noteInfo.createdAt
+        item.createdAt = noteInfo.createdAt
+      }
+    } catch (err) {
+      console.warn(`获取笔记 ${item.noteId} 时间失败:`, err)
+    } finally {
+      item._timeLoading = false
+    }
+  })
+  
+  await Promise.all(promises)
+}
+
 const fetchRecommendations = async () => {
   loading.value = true
   error.value = ''
@@ -167,6 +217,11 @@ const fetchRecommendations = async () => {
   try {
     const data = await getRecommendedNotes(userId, topN.value)
     recommendList.value = Array.isArray(data) ? data : []
+    
+    // 批量获取没有时间的笔记的时间信息
+    if (recommendList.value.length > 0) {
+      await fetchNoteTimes(recommendList.value)
+    }
   } catch (err) {
     console.error('获取推荐列表失败:', err)
     error.value = '获取推荐失败，请稍后重试'

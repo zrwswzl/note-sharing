@@ -29,12 +29,12 @@
                   </svg>
                   {{ result.authorName || '未知作者' }}
                 </span>
-                <span v-if="result.updatedAt" class="meta-time">
+                <span class="meta-time">
                   <svg class="meta-icon" viewBox="0 0 16 16" fill="currentColor">
                     <path d="M8 3.5a.5.5 0 00-1 0V9a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 8.71V3.5z"/>
                     <path d="M8 16A8 8 0 108 0a8 8 0 000 16zm7-8A7 7 0 111 8a7 7 0 0114 0z"/>
                   </svg>
-                  {{ formatTime(result.updatedAt) }}
+                  {{ getDisplayTime(result) }}
                 </span>
               </div>
               <div class="meta-right">
@@ -86,7 +86,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { searchNotes, changeNoteStat } from '@/api/note'
+import { searchNotes, changeNoteStat, getFileUrlByNoteId } from '@/api/note'
 import { useUserStore } from '@/stores/user'
 import { formatTime } from '@/utils/time'
 
@@ -135,6 +135,56 @@ const markViewIncreased = (noteId, userId) => {
   } catch (err) {
     console.warn('写入本地阅读缓存失败:', err)
   }
+}
+
+// 获取显示时间
+const getDisplayTime = (result) => {
+  if (!result) return '时间未知'
+  // 优先使用已获取的时间字段
+  const time = result.updatedAt || result.updated_at || result.createdAt || result.created_at
+  if (time) {
+    return formatTime(time) || '时间未知'
+  }
+  // 如果时间字段为空，返回加载中状态（会在fetchNoteTimes中异步更新）
+  return result._timeLoading ? '加载中...' : '时间未知'
+}
+
+// 批量获取笔记时间信息
+const fetchNoteTimes = async (results) => {
+  if (!results || results.length === 0) return
+  
+  // 找出没有时间的笔记
+  const notesWithoutTime = results.filter(r => 
+    r.noteId && 
+    !r.updatedAt && 
+    !r.updated_at && 
+    !r.createdAt && 
+    !r.created_at &&
+    !r._timeLoading
+  )
+  
+  if (notesWithoutTime.length === 0) return
+  
+  // 标记为加载中
+  notesWithoutTime.forEach(r => { r._timeLoading = true })
+  
+  // 批量获取时间信息
+  const promises = notesWithoutTime.map(async (result) => {
+    try {
+      const noteInfo = await getFileUrlByNoteId(result.noteId)
+      if (noteInfo) {
+        // 使用updatedAt，如果没有则使用createdAt
+        result.updatedAt = noteInfo.updatedAt || noteInfo.createdAt
+        result.createdAt = noteInfo.createdAt
+      }
+    } catch (err) {
+      console.warn(`获取笔记 ${result.noteId} 时间失败:`, err)
+    } finally {
+      result._timeLoading = false
+    }
+  })
+  
+  await Promise.all(promises)
 }
 
 // 高亮关键词
@@ -237,6 +287,11 @@ const handleSearch = async () => {
     
     const results = await searchNotes(keyword, userId)
     searchResults.value = results || []
+    
+    // 批量获取没有时间的笔记的时间信息
+    if (searchResults.value.length > 0) {
+      await fetchNoteTimes(searchResults.value)
+    }
     
     // 更新URL中的关键词
     router.replace({
