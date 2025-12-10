@@ -104,6 +104,12 @@
       <section v-else-if="currentTab === 'circle'">
         <QACircleView ref="qaRef" />
       </section>
+      <section v-else-if="currentTab === 'qa-detail' && route.query.questionId">
+        <QADetailView 
+          :questionId="route.query.questionId"
+          :answerId="route.query.answerId"
+        />
+      </section>
       <section v-else-if="currentTab === 'workspace'">
         <WorkspaceView 
           :initialWorkspaceId="selectedWorkspaceId"
@@ -136,6 +142,7 @@ import NoteDetailView from '../components/user/NoteDetailView.vue'
 import HotView from '../components/user/HotView.vue'
 import RecommendView from '../components/user/RecommendView.vue'
 import QACircleView from '../components/user/QACircleView.vue'
+import QADetailView from '../components/user/QADetailView.vue'
 import { useRouter, useRoute } from 'vue-router'
 import service from '../api/request'
 import { useUserStore } from '@/stores/user'
@@ -223,7 +230,7 @@ watch(currentTab, (newTab, oldTab) => {
 // 监听路由变化，从 URL 中恢复 tab 状态（处理浏览器前进/后退）
 watch(() => route.query.tab, (newTab) => {
   if (newTab) {
-    const validTabs = [...tabs.map(t => t.value), 'search', 'profile', 'note-detail']
+    const validTabs = [...tabs.map(t => t.value), 'search', 'profile', 'note-detail', 'qa-detail']
     if (validTabs.includes(newTab)) {
       currentTab.value = newTab
       // 当切换到 workspace tab 时，恢复选中的空间

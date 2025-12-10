@@ -1,240 +1,89 @@
 <template>
   <div class="qa-page">
-    <section class="qa-hero">
-      <div>
-        <p class="section-label">问答社区</p>
-        <h2>像知乎一样提问、回答、追踪讨论</h2>
-        <p class="hero-desc">
-          直接对接后端 /qa 接口：支持提问、回答、评论、回复、点赞与收藏，便于快速验证链路。
-        </p>
-        <div class="hero-actions">
-          <button class="primary-btn" type="button" @click="openAskDialog">发起提问</button>
-          <div class="fetch-line">
-            <input
-              v-model="fetchId"
-              type="text"
-              placeholder="输入问题 ID，回车拉取详情"
-              @keyup.enter="handleFetchById"
-            />
-            <button class="ghost-btn" type="button" @click="handleFetchById">获取</button>
-          </div>
-        </div>
-      </div>
-      <div class="hero-stats">
-        <div class="stat-card">
-          <p>已加载问题</p>
-          <strong>{{ questionList.length }}</strong>
-        </div>
-        <div class="stat-card">
-          <p>当前查看</p>
-          <strong>{{ activeQuestionId || '未选' }}</strong>
-        </div>
-        <div class="stat-card">
-          <p>登录用户</p>
-          <strong>{{ userStore.userInfo.id ?? '未登录' }}</strong>
-        </div>
-      </div>
-    </section>
-
-    <div class="qa-layout">
-      <section class="question-list">
-        <header class="section-header">
-          <div>
-            <p class="section-label">问题流</p>
-            <h3>最新/手动载入的问题</h3>
-          </div>
-          <span class="muted">点击卡片可在右侧查看详情</span>
-        </header>
-
-        <div v-if="!questionList.length" class="empty">
-          <p>暂无问题数据。</p>
-          <p>可点击“发起提问”创建，或输入已有问题 ID 拉取。</p>
-        </div>
-
-        <article
-          v-for="question in questionList"
-          :key="question.questionId"
-          class="question-card"
-          :class="{ active: question.questionId === activeQuestionId }"
+    <section class="qa-panel">
+      <!-- 标签页切换按钮 -->
+      <div class="tab-buttons">
+        <button
+          v-for="tab in tabs"
+          :key="tab.value"
+          class="tab-button"
+          :class="{ active: activeTab === tab.value }"
+          @click="activeTab = tab.value"
         >
-          <div class="card-title" @click="setActive(question.questionId)">
-            {{ question.title }}
-          </div>
-          <p class="card-excerpt">{{ question.content }}</p>
-          <div class="tag-list">
-            <span v-for="tag in question.tags" :key="tag" class="tag-chip"># {{ tag }}</span>
-            <span v-if="!question.tags || !question.tags.length" class="tag-chip muted">未设置标签</span>
-          </div>
-          <div class="card-meta">
-            <span>{{ formatTime(question.createdAt) }}</span>
-            <span>{{ question.answers?.length || 0 }} 个回答</span>
-            <div class="meta-actions">
-              <button type="button" class="text-btn" @click="handleLikeQuestion(question)">
-                赞同 {{ question.likeCount ?? 0 }}
-              </button>
-              <button type="button" class="text-btn" @click="handleFavoriteQuestion(question)">
-                收藏 {{ question.favoriteCount ?? 0 }}
-              </button>
-              <button type="button" class="text-btn" @click="setActive(question.questionId)">查看</button>
-              <button
-                type="button"
-                class="text-btn danger"
-                @click="handleDeleteQuestion(question)"
-              >
-                删除
-              </button>
+          {{ tab.label }}
+        </button>
+      </div>
+
+      <!-- 加载状态 -->
+      <div v-if="loading" class="state-card">
+        <span class="loader" aria-hidden="true"></span>
+        <p>加载中...</p>
+        <small>正在获取问答数据</small>
+      </div>
+
+      <!-- 问题列表 -->
+      <div v-else-if="displayList.length > 0" class="results-list">
+        <div class="results-header">
+          <p class="results-count">
+            找到 <strong>{{ displayList.length }}</strong> 条{{ getTabLabel() }}
+          </p>
+        </div>
+        <article
+          v-for="item in displayList"
+          :key="item.id"
+          class="result-card"
+          @click="handleItemClick(item)"
+        >
+          <div class="result-content">
+            <h3 class="result-title">{{ item.title }}</h3>
+            <p class="result-summary">{{ item.content }}</p>
+            <div class="result-meta">
+              <div class="meta-left">
+                <span class="meta-author">
+                  <svg class="meta-icon" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm2-3a2 2 0 11-4 0 2 2 0 014 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
+                  </svg>
+                  {{ item.authorName || `用户 #${item.authorId}` }}
+                </span>
+                <span class="meta-time">
+                  <svg class="meta-icon" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 3.5a.5.5 0 00-1 0V9a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 8.71V3.5z"/>
+                    <path d="M8 16A8 8 0 108 0a8 8 0 000 16zm7-8A7 7 0 111 8a7 7 0 0114 0z"/>
+                  </svg>
+                  {{ getDisplayTime(item) }}
+                </span>
+              </div>
+              <div class="meta-right">
+                <span class="meta-stat">
+                  <svg class="meta-icon" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M8 4a.5.5 0 01.5.5v3h3a.5.5 0 010 1h-3v3a.5.5 0 01-1 0v-3h-3a.5.5 0 010-1h3v-3A.5.5 0 018 4z"/>
+                  </svg>
+                  {{ item.likeCount || 0 }} 赞同
+                </span>
+                <span class="meta-stat">
+                  <svg class="meta-icon" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M2.5 1A1.5 1.5 0 001 2.5v11A1.5 1.5 0 002.5 15h6.086a1.5 1.5 0 001.06-.44l4.915-4.914A1.5 1.5 0 0015 7.586V2.5A1.5 1.5 0 0013.5 1h-11zM2 2.5a.5.5 0 01.5-.5h11a.5.5 0 01.5.5v7.086a.5.5 0 01-.146.353l-4.915 4.915a.5.5 0 01-.353.146H2.5a.5.5 0 01-.5-.5v-11z"/>
+                    <path d="M5.5 6a.5.5 0 000 1h5a.5.5 0 000-1h-5zM5 8.5a.5.5 0 01.5-.5h5a.5.5 0 010 1h-5a.5.5 0 01-.5-.5zm0 2a.5.5 0 01.5-.5h2a.5.5 0 010 1h-2a.5.5 0 01-.5-.5z"/>
+                  </svg>
+                  {{ item.answerCount || 0 }} 回答
+                </span>
+                <span v-if="item.tags && item.tags.length" class="meta-tags">
+                  <span v-for="tag in item.tags" :key="tag" class="tag-chip">#{{ tag }}</span>
+                </span>
+              </div>
             </div>
           </div>
         </article>
-      </section>
+      </div>
 
-      <section class="question-detail">
-        <header class="section-header">
-          <div>
-            <p class="section-label">问题详情</p>
-            <h3>{{ activeQuestion?.title || '请选择左侧问题或新建一个' }}</h3>
-          </div>
-          <span class="muted">
-            {{ detailLoading ? '加载中...' : (activeQuestionId ? `ID: ${activeQuestionId}` : '') }}
-          </span>
-        </header>
+      <!-- 空状态 -->
+      <div v-else class="state-card">
+        <p>暂无{{ getTabLabel() }}</p>
+        <small>{{ getEmptyHint() }}</small>
+      </div>
+    </section>
 
-        <div v-if="activeQuestion">
-          <div class="detail-head">
-            <p class="detail-content">{{ activeQuestion.content }}</p>
-            <div class="tag-list">
-              <span v-for="tag in activeQuestion.tags" :key="tag" class="tag-chip"># {{ tag }}</span>
-              <span v-if="!activeQuestion.tags?.length" class="tag-chip muted">无标签</span>
-            </div>
-            <div class="detail-meta">
-              <span>作者 ID：{{ activeQuestion.authorId }}</span>
-              <span>创建时间：{{ formatTime(activeQuestion.createdAt) }}</span>
-              <div class="meta-actions">
-                <button class="text-btn" type="button" @click="handleLikeQuestion(activeQuestion)">
-                  赞同 {{ activeQuestion.likeCount ?? 0 }}
-                </button>
-                <button class="text-btn" type="button" @click="handleFavoriteQuestion(activeQuestion)">
-                  收藏 {{ activeQuestion.favoriteCount ?? 0 }}
-                </button>
-                <button class="text-btn danger" type="button" @click="handleDeleteQuestion(activeQuestion)">
-                  删除
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="answer-editor">
-            <textarea
-              v-model="answerInput"
-              rows="3"
-              placeholder="写下你的回答..."
-            ></textarea>
-            <div class="editor-actions">
-              <div class="muted">当前用户：{{ userStore.userInfo.id ?? '未登录' }}</div>
-              <button class="primary-btn" type="button" @click="handleCreateAnswer">发布回答</button>
-            </div>
-          </div>
-
-          <div class="answer-list" v-if="activeQuestion.answers?.length">
-            <div v-for="answer in activeQuestion.answers" :key="answer.answerId" class="answer-card">
-              <div class="answer-meta">
-                <div class="meta-left">
-                  <strong>回答者 #{{ answer.authorId }}</strong>
-                  <span>{{ formatTime(answer.createdAt) }}</span>
-                </div>
-                <div class="meta-actions">
-                  <button class="text-btn" type="button" @click="handleLikeAnswer(answer)">
-                    赞同 {{ answer.likeCount ?? 0 }}
-                  </button>
-                  <button class="text-btn danger" type="button" @click="handleDeleteAnswer(answer)">
-                    删除
-                  </button>
-                </div>
-              </div>
-              <p class="answer-content">{{ answer.content }}</p>
-
-              <div class="comment-editor">
-                <input
-                  v-model="commentDrafts[answer.answerId]"
-                  type="text"
-                  placeholder="写评论..."
-                />
-                <button class="ghost-btn" type="button" @click="handleCreateComment(answer.answerId)">
-                  评论
-                </button>
-              </div>
-
-              <div class="comment-list" v-if="answer.comments?.length">
-                <div v-for="comment in answer.comments" :key="comment.commentId" class="comment-row">
-                  <div class="comment-meta">
-                    <div class="meta-left">
-                      <strong>评论者 #{{ comment.authorId }}</strong>
-                      <span>{{ formatTime(comment.createdAt) }}</span>
-                    </div>
-                    <div class="meta-actions">
-                      <button class="text-btn" type="button" @click="handleLikeComment(answer, comment)">
-                        赞 {{ comment.likeCount ?? 0 }}
-                      </button>
-                      <button
-                        class="text-btn danger"
-                        type="button"
-                        @click="handleDeleteComment(answer, comment)"
-                      >
-                        删
-                      </button>
-                    </div>
-                  </div>
-                  <p class="comment-content">{{ comment.content }}</p>
-
-                  <div class="reply-editor">
-                    <input
-                      v-model="replyDrafts[`${answer.answerId}-${comment.commentId}`]"
-                      type="text"
-                      placeholder="写回复..."
-                    />
-                    <button
-                      class="ghost-btn"
-                      type="button"
-                      @click="handleCreateReply(answer.answerId, comment.commentId)"
-                    >
-                      回复
-                    </button>
-                  </div>
-
-                  <div class="reply-list" v-if="comment.replies?.length">
-                    <div v-for="reply in comment.replies" :key="reply.replyId" class="reply-chip">
-                      <div class="meta-left">
-                        <span>#{{ reply.authorId }}</span>
-                        <span>{{ formatTime(reply.createdAt) }}</span>
-                      </div>
-                      <p>{{ reply.content }}</p>
-                      <div class="meta-actions">
-                        <button class="text-btn" type="button" @click="handleLikeReply(answer, comment, reply)">
-                          赞 {{ reply.likeCount ?? 0 }}
-                        </button>
-                        <button
-                          class="text-btn danger"
-                          type="button"
-                          @click="handleDeleteReply(answer, comment, reply)"
-                        >
-                          删
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div v-else class="muted small">暂无评论</div>
-            </div>
-          </div>
-          <div v-else class="empty">还没有回答，快来写下第一条回答吧。</div>
-        </div>
-        <div v-else class="empty">
-          请选择左侧问题或点击“发起提问”。
-        </div>
-      </section>
-    </div>
-
+    <!-- 发起提问对话框 -->
     <div v-if="askVisible" class="dialog-mask">
       <div class="dialog">
         <header class="dialog-header">
@@ -259,31 +108,30 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { ref, computed, reactive, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import {
-  createAnswer,
-  createComment,
   createQuestion,
-  createReply,
-  deleteAnswer,
-  deleteComment,
-  deleteQuestion,
-  deleteReply,
-  favoriteQuestion,
   getQuestionDetail,
-  likeAnswer,
-  likeComment,
-  likeQuestion,
-  likeReply
+  deleteQuestion
 } from '@/api/qa'
+import { formatTime } from '@/utils/time'
 
+const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
-const questionList = ref([])
-const activeQuestionId = ref(null)
-const detailLoading = ref(false)
+// 标签页配置
+const tabs = [
+  { label: '我的问题', value: 'my-questions' },
+  { label: '我的回答', value: 'my-answers' },
+  { label: '所有问答', value: 'all' }
+]
 
+const activeTab = ref('my-questions')
+const loading = ref(false)
+const questionList = ref([]) // 存储所有问题
 const askVisible = ref(false)
 const askForm = reactive({
   title: '',
@@ -291,423 +139,438 @@ const askForm = reactive({
   tagsText: ''
 })
 
-const fetchId = ref('')
-const answerInput = ref('')
-const commentDrafts = reactive({})
-const replyDrafts = reactive({})
-
-const activeQuestion = computed(() =>
-  questionList.value.find(q => q.questionId === activeQuestionId.value) || null
-)
-
-const normalizeQuestion = (vo) => ({
-  ...vo,
-  answers: vo?.answers || [],
-  tags: vo?.tags || []
-})
-
-const setActive = (id) => {
-  activeQuestionId.value = id
-}
-
-const upsertQuestion = (vo) => {
-  const data = normalizeQuestion(vo)
-  const idx = questionList.value.findIndex(item => item.questionId === data.questionId)
-  if (idx >= 0) {
-    questionList.value[idx] = data
-  } else {
-    questionList.value.unshift(data)
-  }
-}
-
-const formatTime = (val) => {
-  if (!val) return '刚刚'
+// 从localStorage加载问题列表
+const loadQuestionsFromStorage = () => {
   try {
-    return new Date(val).toLocaleString()
-  } catch (e) {
-    return String(val)
-  }
-}
-
-const ensureLogin = () => {
-  if (!userStore.userInfo.id) {
-    window.alert('请先登录后再进行此操作')
-    return false
-  }
-  return true
-}
-
-const fetchDetail = async (id, setActiveTab = true) => {
-  if (!id) return
-  detailLoading.value = true
-  try {
-    const data = await getQuestionDetail(id)
-    if (data) {
-      upsertQuestion(data)
-      if (setActiveTab) {
-        activeQuestionId.value = data.questionId
-      }
-    } else {
-      window.alert('未找到对应问题')
+    const stored = localStorage.getItem('qa_question_list')
+    if (stored) {
+      questionList.value = JSON.parse(stored)
     }
   } catch (err) {
-    console.error('获取问题详情失败', err)
-    window.alert('获取问题详情失败，请检查 ID 或后端服务')
-  } finally {
-    detailLoading.value = false
+    console.warn('加载本地问题列表失败:', err)
   }
 }
 
-const handleFetchById = async () => {
-  const id = fetchId.value.trim()
-  if (!id) return
-  await fetchDetail(id, true)
+// 保存问题列表到localStorage
+const saveQuestionsToStorage = () => {
+  try {
+    localStorage.setItem('qa_question_list', JSON.stringify(questionList.value))
+  } catch (err) {
+    console.warn('保存问题列表失败:', err)
+  }
 }
 
+// 添加或更新问题到列表
+const upsertQuestion = (questionVO) => {
+  if (!questionVO || !questionVO.questionId) return
+  
+  const idx = questionList.value.findIndex(q => q.questionId === questionVO.questionId)
+  const questionData = {
+    questionId: questionVO.questionId,
+    authorId: questionVO.authorId,
+    title: questionVO.title,
+    content: questionVO.content,
+    tags: questionVO.tags || [],
+    createdAt: questionVO.createdAt,
+    likeCount: questionVO.likeCount || 0,
+    favoriteCount: questionVO.favoriteCount || 0,
+    answerCount: questionVO.answers?.length || 0,
+    answers: questionVO.answers || [],
+    authorName: `用户 #${questionVO.authorId}` // 可以后续优化获取用户名
+  }
+  
+  if (idx >= 0) {
+    questionList.value[idx] = questionData
+  } else {
+    questionList.value.unshift(questionData)
+  }
+  
+  saveQuestionsToStorage()
+}
+
+// 根据当前标签页筛选显示列表
+const displayList = computed(() => {
+  const userId = userStore.userInfo?.id
+  if (!userId) return []
+  
+  switch (activeTab.value) {
+    case 'my-questions':
+      // 我的问题：筛选authorId等于当前用户ID的问题
+      return questionList.value
+        .filter(q => q.authorId === userId)
+        .map(q => ({
+          id: q.questionId,
+          type: 'question',
+          questionId: q.questionId,
+          title: q.title,
+          content: q.content,
+          authorId: q.authorId,
+          authorName: q.authorName,
+          createdAt: q.createdAt,
+          likeCount: q.likeCount,
+          answerCount: q.answerCount,
+          tags: q.tags
+        }))
+    
+    case 'my-answers':
+      // 我的回答：遍历所有问题，找到answers中authorId等于当前用户ID的
+      const myAnswers = []
+      questionList.value.forEach(q => {
+        if (q.answers && q.answers.length > 0) {
+          q.answers.forEach(answer => {
+            if (answer.authorId === userId) {
+              myAnswers.push({
+                id: `${q.questionId}-${answer.answerId}`,
+                type: 'answer',
+                questionId: q.questionId,
+                answerId: answer.answerId,
+                title: `回答：${q.title}`,
+                content: answer.content,
+                authorId: answer.authorId,
+                authorName: q.authorName,
+                createdAt: answer.createdAt || q.createdAt,
+                likeCount: answer.likeCount || 0,
+                answerCount: q.answerCount,
+                tags: q.tags,
+                questionTitle: q.title // 保存问题标题用于显示
+              })
+            }
+          })
+        }
+      })
+      return myAnswers
+    
+    case 'all':
+      // 所有问答：显示所有问题
+      return questionList.value.map(q => ({
+        id: q.questionId,
+        type: 'question',
+        questionId: q.questionId,
+        title: q.title,
+        content: q.content,
+        authorId: q.authorId,
+        authorName: q.authorName,
+        createdAt: q.createdAt,
+        likeCount: q.likeCount,
+        answerCount: q.answerCount,
+        tags: q.tags
+      }))
+    
+    default:
+      return []
+  }
+})
+
+// 获取标签页名称
+const getTabLabel = () => {
+  const tab = tabs.find(t => t.value === activeTab.value)
+  return tab ? tab.label : '内容'
+}
+
+// 获取空状态提示
+const getEmptyHint = () => {
+  switch (activeTab.value) {
+    case 'my-questions':
+      return '你还没有提问过，点击右上角"发起提问"开始吧'
+    case 'my-answers':
+      return '你还没有回答过任何问题'
+    case 'all':
+      return '还没有问答内容，点击右上角"发起提问"创建第一个问题吧'
+    default:
+      return ''
+  }
+}
+
+// 获取显示时间
+const getDisplayTime = (item) => {
+  if (!item || !item.createdAt) return '时间未知'
+  return formatTime(item.createdAt) || '时间未知'
+}
+
+// 处理点击问题或回答
+const handleItemClick = async (item) => {
+  if (!item || !item.questionId) return
+  
+  try {
+    // 跳转到问答详情页，通过路由参数传递questionId
+    router.replace({
+      path: route.path,
+      query: {
+        ...route.query,
+        tab: 'qa-detail',
+        questionId: item.questionId,
+        answerId: item.type === 'answer' ? item.answerId : undefined
+      }
+    })
+  } catch (error) {
+    console.error('跳转失败:', error)
+  }
+}
+
+// 打开提问对话框
 const openAskDialog = () => {
   askVisible.value = true
 }
 
+// 关闭提问对话框
 const closeAskDialog = () => {
   askVisible.value = false
+  askForm.title = ''
+  askForm.content = ''
+  askForm.tagsText = ''
 }
 
+// 创建问题
 const handleCreateQuestion = async () => {
-  if (!ensureLogin()) return
+  const userId = userStore.userInfo?.id
+  if (!userId) {
+    window.alert('请先登录后再进行此操作')
+    return
+  }
+  
   const title = askForm.title.trim()
   const content = askForm.content.trim()
   if (!title || !content) {
     window.alert('标题和内容不能为空')
     return
   }
+  
   const tags = askForm.tagsText
     .split(/[,，]/)
     .map(t => t.trim())
     .filter(Boolean)
-
+  
+  loading.value = true
   try {
     const data = await createQuestion({
-      authorId: userStore.userInfo.id,
+      authorId: userId,
       title,
       content,
       tags
     })
+    
     if (data) {
       upsertQuestion(data)
-      activeQuestionId.value = data.questionId
-      fetchId.value = data.questionId
-      askForm.title = ''
-      askForm.content = ''
-      askForm.tagsText = ''
       closeAskDialog()
-      await fetchDetail(data.questionId, true)
+      
+      // 切换到"我的问题"标签页
+      activeTab.value = 'my-questions'
+      
+      // 跳转到问题详情页
+      await handleItemClick({
+        questionId: data.questionId,
+        type: 'question'
+      })
     }
   } catch (err) {
     console.error('创建问题失败', err)
     window.alert('创建问题失败，请检查后端接口或输入内容')
+  } finally {
+    loading.value = false
   }
 }
 
-const handleDeleteQuestion = async (question) => {
-  if (!question?.questionId) return
-  if (!window.confirm('确认删除该问题吗？')) return
-  try {
-    await deleteQuestion(question.questionId)
-    questionList.value = questionList.value.filter(q => q.questionId !== question.questionId)
-    if (activeQuestionId.value === question.questionId) {
-      activeQuestionId.value = questionList.value[0]?.questionId || null
+// 监听路由中的questionId，如果有则加载问题详情
+watch(() => route.query.questionId, async (questionId) => {
+  if (questionId && !questionList.value.find(q => q.questionId === questionId)) {
+    // 如果问题不在列表中，则加载
+    loading.value = true
+    try {
+      const data = await getQuestionDetail(questionId)
+      if (data) {
+        upsertQuestion(data)
+      }
+    } catch (err) {
+      console.error('获取问题详情失败', err)
+    } finally {
+      loading.value = false
     }
-  } catch (err) {
-    console.error('删除问题失败', err)
-    window.alert('删除问题失败')
   }
-}
+}, { immediate: true })
 
-const handleLikeQuestion = async (question) => {
-  if (!ensureLogin()) return
-  if (!question?.questionId) return
-  try {
-    await likeQuestion(userStore.userInfo.id, question.questionId)
-    await fetchDetail(question.questionId, question.questionId === activeQuestionId.value)
-  } catch (err) {
-    console.error('点赞问题失败', err)
-    window.alert('点赞失败')
+// 组件挂载时加载本地存储的问题列表
+onMounted(() => {
+  loadQuestionsFromStorage()
+  
+  // 如果路由中有questionId，加载该问题
+  if (route.query.questionId) {
+    const questionId = route.query.questionId
+    if (!questionList.value.find(q => q.questionId === questionId)) {
+      loading.value = true
+      getQuestionDetail(questionId)
+        .then(data => {
+          if (data) {
+            upsertQuestion(data)
+          }
+        })
+        .catch(err => {
+          console.error('获取问题详情失败', err)
+        })
+        .finally(() => {
+          loading.value = false
+        })
+    }
   }
-}
-
-const handleFavoriteQuestion = async (question) => {
-  if (!ensureLogin()) return
-  if (!question?.questionId) return
-  try {
-    await favoriteQuestion(userStore.userInfo.id, question.questionId)
-    await fetchDetail(question.questionId, question.questionId === activeQuestionId.value)
-  } catch (err) {
-    console.error('收藏问题失败', err)
-    window.alert('收藏失败')
-  }
-}
-
-const handleCreateAnswer = async () => {
-  if (!ensureLogin()) return
-  if (!activeQuestionId.value) {
-    window.alert('请先选择一个问题')
-    return
-  }
-  const content = answerInput.value.trim()
-  if (!content) {
-    window.alert('回答内容不能为空')
-    return
-  }
-  try {
-    await createAnswer({
-      questionId: activeQuestionId.value,
-      authorId: userStore.userInfo.id,
-      content
-    })
-    answerInput.value = ''
-    await fetchDetail(activeQuestionId.value, true)
-  } catch (err) {
-    console.error('创建回答失败', err)
-    window.alert('创建回答失败')
-  }
-}
-
-const handleDeleteAnswer = async (answer) => {
-  if (!activeQuestionId.value || !answer?.answerId) return
-  if (!window.confirm('确认删除该回答吗？')) return
-  try {
-    await deleteAnswer(activeQuestionId.value, answer.answerId)
-    await fetchDetail(activeQuestionId.value, true)
-  } catch (err) {
-    console.error('删除回答失败', err)
-    window.alert('删除回答失败')
-  }
-}
-
-const handleLikeAnswer = async (answer) => {
-  if (!ensureLogin()) return
-  if (!activeQuestionId.value || !answer?.answerId) return
-  try {
-    await likeAnswer(userStore.userInfo.id, activeQuestionId.value, answer.answerId)
-    await fetchDetail(activeQuestionId.value, true)
-  } catch (err) {
-    console.error('点赞回答失败', err)
-    window.alert('点赞失败')
-  }
-}
-
-const handleCreateComment = async (answerId) => {
-  if (!ensureLogin()) return
-  if (!activeQuestionId.value || !answerId) return
-  const content = (commentDrafts[answerId] || '').trim()
-  if (!content) {
-    window.alert('评论内容不能为空')
-    return
-  }
-  try {
-    await createComment({
-      questionId: activeQuestionId.value,
-      answerId,
-      authorId: userStore.userInfo.id,
-      content
-    })
-    commentDrafts[answerId] = ''
-    await fetchDetail(activeQuestionId.value, true)
-  } catch (err) {
-    console.error('创建评论失败', err)
-    window.alert('创建评论失败')
-  }
-}
-
-const handleDeleteComment = async (answer, comment) => {
-  if (!activeQuestionId.value || !answer?.answerId || !comment?.commentId) return
-  if (!window.confirm('确认删除该评论吗？')) return
-  try {
-    await deleteComment(activeQuestionId.value, answer.answerId, comment.commentId)
-    await fetchDetail(activeQuestionId.value, true)
-  } catch (err) {
-    console.error('删除评论失败', err)
-    window.alert('删除评论失败')
-  }
-}
-
-const handleLikeComment = async (answer, comment) => {
-  if (!ensureLogin()) return
-  if (!activeQuestionId.value || !answer?.answerId || !comment?.commentId) return
-  try {
-    await likeComment(userStore.userInfo.id, activeQuestionId.value, answer.answerId, comment.commentId)
-    await fetchDetail(activeQuestionId.value, true)
-  } catch (err) {
-    console.error('点赞评论失败', err)
-    window.alert('点赞失败')
-  }
-}
-
-const handleCreateReply = async (answerId, commentId) => {
-  if (!ensureLogin()) return
-  if (!activeQuestionId.value || !answerId || !commentId) return
-  const key = `${answerId}-${commentId}`
-  const content = (replyDrafts[key] || '').trim()
-  if (!content) {
-    window.alert('回复内容不能为空')
-    return
-  }
-  try {
-    await createReply({
-      questionId: activeQuestionId.value,
-      answerId,
-      commentId,
-      authorId: userStore.userInfo.id,
-      content
-    })
-    replyDrafts[key] = ''
-    await fetchDetail(activeQuestionId.value, true)
-  } catch (err) {
-    console.error('创建回复失败', err)
-    window.alert('创建回复失败')
-  }
-}
-
-const handleDeleteReply = async (answer, comment, reply) => {
-  if (!activeQuestionId.value || !answer?.answerId || !comment?.commentId || !reply?.replyId) return
-  if (!window.confirm('确认删除该回复吗？')) return
-  try {
-    await deleteReply(activeQuestionId.value, answer.answerId, comment.commentId, reply.replyId)
-    await fetchDetail(activeQuestionId.value, true)
-  } catch (err) {
-    console.error('删除回复失败', err)
-    window.alert('删除回复失败')
-  }
-}
-
-const handleLikeReply = async (answer, comment, reply) => {
-  if (!ensureLogin()) return
-  if (!activeQuestionId.value || !answer?.answerId || !comment?.commentId || !reply?.replyId) return
-  try {
-    await likeReply(
-      userStore.userInfo.id,
-      activeQuestionId.value,
-      answer.answerId,
-      comment.commentId,
-      reply.replyId
-    )
-    await fetchDetail(activeQuestionId.value, true)
-  } catch (err) {
-    console.error('点赞回复失败', err)
-    window.alert('点赞失败')
-  }
-}
+})
 
 defineExpose({ openAskDialog })
 </script>
 
 <style scoped>
+:global(:root) {
+  --brand-primary: #007FFF;
+  --surface-base: #ffffff;
+  --surface-muted: #f6f6f6;
+  --line-soft: #e2e2e2;
+  --text-strong: #111c17;
+  --text-secondary: #666;
+  --text-muted: #999;
+}
+
 .qa-page {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
+  min-height: 100vh;
+  padding: 20px 24px 100px;
+  background: var(--surface-muted);
 }
 
-.qa-hero {
-  display: flex;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 20px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: #fff;
-}
-
-.hero-desc {
-  color: #6b7280;
-  margin: 8px 0 12px;
-}
-
-.hero-actions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.hero-stats {
-  display: grid;
-  grid-template-columns: repeat(1, minmax(140px, 1fr));
-  gap: 10px;
-  align-items: start;
-}
-
-.stat-card {
-  padding: 12px 14px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #f9fafb;
-}
-
-.qa-layout {
-  display: grid;
-  grid-template-columns: 1.1fr 1.3fr;
-  gap: 16px;
-}
-
-.question-list,
-.question-detail {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
+.qa-panel {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  background: var(--surface-base);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  padding: 32px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   min-height: 400px;
 }
 
-.section-header {
+.tab-buttons {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+  gap: 8px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line-soft);
 }
 
-.section-label {
-  font-size: 12px;
-  color: #9ca3af;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  margin: 0;
+.tab-button {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
 }
 
-.muted {
-  color: #9ca3af;
+.tab-button:hover {
+  background: var(--surface-muted);
+  color: var(--text-strong);
 }
 
-.small {
-  font-size: 12px;
-}
-
-.question-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 12px;
-  margin-bottom: 10px;
-  background: #fafafa;
-}
-
-.question-card.active {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
-}
-
-.card-title {
+.tab-button.active {
+  background: var(--brand-primary);
+  color: #fff;
   font-weight: 600;
-  font-size: 16px;
+}
+
+.results-header {
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.results-count {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.results-count strong {
+  color: var(--brand-primary);
+  font-weight: 600;
+}
+
+.results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.result-card {
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface-base);
+  transition: border-color 0.2s, box-shadow 0.2s;
   cursor: pointer;
 }
 
-.card-excerpt {
-  margin: 6px 0 10px;
-  color: #4b5563;
+.result-card:hover {
+  border-color: var(--brand-primary);
+  box-shadow: 0 2px 8px rgba(0, 127, 255, 0.1);
+}
+
+.result-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.result-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-strong);
   line-height: 1.5;
 }
 
-.tag-list {
+.result-summary {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.result-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.meta-left,
+.meta-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.meta-author,
+.meta-time,
+.meta-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.meta-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.meta-tags {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
@@ -717,186 +580,46 @@ defineExpose({ openAskDialog })
   background: #eef2ff;
   color: #4338ca;
   padding: 4px 8px;
-  border-radius: 8px;
+  border-radius: 6px;
   font-size: 12px;
 }
 
-.tag-chip.muted {
-  background: #f3f4f6;
-  color: #9ca3af;
-}
-
-.card-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 8px;
-  color: #6b7280;
-}
-
-.meta-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.detail-head {
-  border-bottom: 1px solid #e5e7eb;
-  padding-bottom: 12px;
-  margin-bottom: 14px;
-}
-
-.detail-content {
-  color: #374151;
-  line-height: 1.6;
-}
-
-.detail-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 8px;
-  align-items: center;
-  color: #6b7280;
-}
-
-.answer-editor textarea {
-  width: 100%;
-  border: 1px solid #e5e7eb;
+.state-card {
   border-radius: 8px;
-  padding: 10px;
-  resize: vertical;
-}
-
-.editor-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 8px;
-}
-
-.answer-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 12px;
-  margin-top: 12px;
-  background: #f9fafb;
-}
-
-.answer-meta,
-.comment-meta {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: #6b7280;
-}
-
-.answer-content,
-.comment-content {
-  margin: 8px 0;
-  color: #374151;
-  line-height: 1.5;
-}
-
-.comment-editor,
-.reply-editor {
-  display: flex;
-  gap: 8px;
-  margin: 8px 0;
-}
-
-.comment-editor input,
-.reply-editor input {
-  flex: 1;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 8px 10px;
-}
-
-.comment-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.comment-row {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 10px;
-}
-
-.reply-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-.reply-chip {
-  border: 1px dashed #e5e7eb;
-  border-radius: 8px;
-  padding: 8px;
-  background: #fdfefe;
-}
-
-.empty {
-  padding: 24px 0;
+  border: 1px dashed var(--line-soft);
+  padding: 60px 24px;
   text-align: center;
-  color: #9ca3af;
-}
-
-.primary-btn {
-  background: #2563eb;
-  color: #fff;
-  border: none;
-  padding: 8px 14px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.ghost-btn {
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  color: #374151;
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.text-btn {
-  background: none;
-  border: none;
-  color: #2563eb;
-  cursor: pointer;
-  padding: 2px 6px;
-}
-
-.text-btn.danger {
-  color: #dc2626;
-}
-
-.ghost-btn:hover,
-.primary-btn:hover,
-.text-btn:hover {
-  opacity: 0.9;
-}
-
-.fetch-line {
+  color: var(--text-secondary);
   display: flex;
+  flex-direction: column;
+  gap: 10px;
   align-items: center;
-  gap: 8px;
-  background: #f3f4f6;
-  padding: 6px 8px;
-  border-radius: 10px;
 }
 
-.fetch-line input {
-  border: none;
-  background: transparent;
-  outline: none;
-  padding: 6px 8px;
-  min-width: 220px;
+.state-card p {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-strong);
+}
+
+.state-card small {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.loader {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid var(--line-soft);
+  border-top-color: var(--brand-primary);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .dialog-mask {
@@ -920,12 +643,29 @@ defineExpose({ openAskDialog })
   gap: 10px;
 }
 
+.dialog-header h4 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .dialog-body input,
 .dialog-body textarea {
   width: 100%;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--line-soft);
   border-radius: 8px;
   padding: 10px;
+  font-size: 14px;
+}
+
+.dialog-body textarea {
+  resize: vertical;
 }
 
 .dialog-footer {
@@ -934,11 +674,49 @@ defineExpose({ openAskDialog })
   gap: 10px;
 }
 
-@media (max-width: 1100px) {
-  .qa-layout {
-    grid-template-columns: 1fr;
+.primary-btn {
+  background: var(--brand-primary);
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.ghost-btn {
+  border: 1px solid var(--line-soft);
+  background: #fff;
+  color: var(--text-strong);
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.primary-btn:hover,
+.ghost-btn:hover {
+  opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+  .qa-page {
+    padding: 16px;
+  }
+
+  .qa-panel {
+    padding: 20px;
+  }
+
+  .result-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .meta-left,
+  .meta-right {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 </style>
-
-
