@@ -1,9 +1,7 @@
 package com.project.login.service.hot;
 
 import com.project.login.model.vo.NoteSearchVO;
-import com.project.login.model.dto.search.NoteSearchDTO;
 import com.project.login.repository.NoteRepository;
-import com.project.login.service.search.SearchService;
 import com.project.login.mapper.NoteStatsMapper;
 import com.project.login.model.dataobject.NoteStatsDO;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -12,7 +10,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import co.elastic.clients.elasticsearch.ElasticsearchClient;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -86,10 +83,46 @@ public class HotService {
         try {
             String json = redisTemplate.opsForValue().get(HOT_NOTE_KEY);
             if (json != null && !json.isEmpty()) {
+                // 清理可能的格式问题：去除前后空白
+                json = json.trim();
+                
+                // 处理多个 JSON 值连接的情况（如 [1,2][3,4] 或 [1,2]-[3,4]）
+                if (json.startsWith("[")) {
+                    // 找到第一个完整的 JSON 数组的结束位置
+                    int bracketCount = 0;
+                    int endIndex = -1;
+                    for (int i = 0; i < json.length(); i++) {
+                        char c = json.charAt(i);
+                        if (c == '[') bracketCount++;
+                        if (c == ']') bracketCount--;
+                        if (bracketCount == 0 && i > 0) {
+                            endIndex = i;
+                            break;
+                        }
+                    }
+                    if (endIndex > 0 && endIndex < json.length() - 1) {
+                        // 如果后面还有内容，只取第一个完整的 JSON 数组
+                        json = json.substring(0, endIndex + 1);
+                    }
+                }
+                
+                // 验证 JSON 格式：必须是有效的数组格式
+                if (!json.startsWith("[") || !json.endsWith("]")) {
+                    throw new IllegalArgumentException("Redis 中的数据不是有效的 JSON 数组格式: " + json);
+                }
+                
                 return objectMapper.readValue(json, new TypeReference<List<Long>>() {});
             }
         } catch (Exception e) {
+            // 记录详细的错误信息，包括原始 JSON 数据
+            String json = redisTemplate.opsForValue().get(HOT_NOTE_KEY);
+            System.err.println("========== 解析热榜数据失败 ==========");
+            System.err.println("原始数据: " + json);
+            System.err.println("数据长度: " + (json != null ? json.length() : 0));
+            System.err.println("错误类型: " + e.getClass().getName());
+            System.err.println("错误信息: " + e.getMessage());
             e.printStackTrace();
+            System.err.println("=====================================");
         }
         return Collections.emptyList();
     }
