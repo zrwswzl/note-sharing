@@ -184,6 +184,40 @@ watch(currentTab, (newTab, oldTab) => {
     noteDetailStats.value = null
     noteDetailTitle.value = null
   }
+  // 当切换到非 workspace tab 时，自动关闭编辑器
+  if (newTab !== 'workspace' && editingNotebookId.value !== null) {
+    // 保存笔记所在的空间ID，用于回到 workspace tab 时选中
+    const spaceIdBeforeClose = editingSpaceId.value
+    
+    editingNotebookId.value = null
+    editingSpaceId.value = null
+    editingNotebookName.value = null
+    editingNotebookList.value = []
+    editingNoteId.value = null
+    
+    // 清除 URL 中的编辑器相关参数
+    const newQuery = { ...route.query }
+    delete newQuery.notebookId
+    delete newQuery.spaceId
+    delete newQuery.notebookName
+    delete newQuery.noteId
+    
+    router.replace({
+      path: route.path,
+      query: newQuery
+    })
+  }
+  // 当切换回 workspace tab 时，如果 URL 中有 notebookId，恢复编辑器状态
+  else if (newTab === 'workspace' && editingNotebookId.value === null) {
+    const notebookIdFromQuery = route.query.notebookId
+    const spaceIdFromQuery = route.query.spaceId
+    if (notebookIdFromQuery && spaceIdFromQuery) {
+      // 异步恢复编辑器状态，但不设置 currentTab（因为已经是 workspace 了）
+      restoreEditorFromRoute(false).catch(err => {
+        console.error('恢复编辑器状态失败:', err)
+      })
+    }
+  }
 })
 
 // 监听路由变化，从 URL 中恢复 tab 状态（处理浏览器前进/后退）
@@ -246,7 +280,7 @@ const getTagNameString = async (tag) => {
 }
 
 // 从 URL 查询参数中恢复编辑器状态
-const restoreEditorFromRoute = async () => {
+const restoreEditorFromRoute = async (shouldSetTab = true) => {
   const notebookIdFromQuery = route.query.notebookId
   const spaceIdFromQuery = route.query.spaceId
   
@@ -259,8 +293,10 @@ const restoreEditorFromRoute = async () => {
       editingNotebookId.value = notebookId
       editingSpaceId.value = spaceId
       
-      // 设置 tab 为 workspace，确保显示正确的视图
-      currentTab.value = 'workspace'
+      // 如果需要，设置 tab 为 workspace，确保显示正确的视图
+      if (shouldSetTab) {
+        currentTab.value = 'workspace'
+      }
       
       // 从 URL 获取 notebookName
       editingNotebookName.value = route.query.notebookName || null
