@@ -6,6 +6,7 @@ import com.project.login.model.dataobject.*;
 import com.project.login.model.dto.note.*;
 import com.project.login.model.event.EsNoteEvent;
 import com.project.login.model.event.NoteActionType;
+import com.project.login.model.vo.NoteShowVO;
 import com.project.login.model.vo.NoteVO;
 import com.project.login.service.minio.MinioService;
 import lombok.RequiredArgsConstructor;
@@ -240,10 +241,19 @@ public class NoteService {
     }
 
     @Transactional(readOnly = true)
-    public String getFileUrlByNoteId(Long noteId) {
-        String fileName = noteMapper.selectFileNameByNoteId(noteId);
-        String url = minioservice.getFileUrl(fileName);
-        return url;
+    public NoteShowVO getNoteByNoteId(Long noteId) {
+        NoteDO existing = noteMapper.selectById(noteId);
+        if (existing == null) throw new RuntimeException("笔记不存在");
+        String url = minioservice.getFileUrl(existing.getFilename());
+        NoteShowVO vo = new NoteShowVO();
+        vo.setId(existing.getId());
+        vo.setTitle(existing.getTitle());
+        vo.setUrl(url);
+        vo.setFileType(existing.getFileType());
+        vo.setNotebookId(existing.getNotebookId());
+        vo.setCreatedAt(existing.getCreatedAt());
+        vo.setUpdatedAt(existing.getUpdatedAt());
+        return vo;
     }
 
 
