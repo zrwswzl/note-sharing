@@ -79,12 +79,13 @@
           <button class="download-btn" @click="handleAction('下载', currentNote.id)">下载文件</button>
         </header>
         <div class="file-content">
-          <VuePdfEmbed
-              v-if="pdfPreviewUrl"
-              :source="pdfPreviewUrl"
-              class="pdf-embed-viewer"
-              :width="700"
-          />
+          <div v-if="pdfPreviewUrl" class="pdf-wrapper">
+            <VuePdfEmbed
+                :source="pdfPreviewUrl"
+                class="pdf-embed-viewer"
+                :width="700"
+            />
+          </div>
           <p v-else>正在加载 PDF 文件...</p>
         </div>
       </div>
@@ -1937,13 +1938,29 @@ const toggleInsertMenu = () => showInsertMenu.value = !showInsertMenu.value;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start; /* 从顶部开始对齐 */
   min-height: 0; /* 【关键强化】防止 flex item 因内容过多而溢出 */
+  /* 确保PDF内容不被头部栏遮挡 */
+  scroll-padding-top: 0;
+}
+
+.pdf-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  /* 确保PDF内容有足够的顶部间距，避免被头部栏遮挡 */
+  padding-top: 0;
 }
 
 .pdf-embed-viewer {
   max-width: 100%;
   height: auto;
+  margin: 0 auto;
+  display: block;
+  /* 确保PDF内容不被遮挡 */
+  position: relative;
+  z-index: 1;
 }
 
 /* ================================================= */
