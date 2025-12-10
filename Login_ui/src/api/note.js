@@ -174,3 +174,85 @@ export const getFileUrl = (filename) => {
     return service.post('/noting/notes/files/url', requestBody)
         .then(res => res.data.data);
 };
+
+/**
+ * [对应后端: POST /noting/notes/files/id_url]
+ * 通过笔记ID获取笔记信息 (返回 NoteShowVO 对象，包含 id, title, url, fileType 等)
+ * @param {number} noteId - 笔记ID
+ * @returns {Promise<{id: number, title: string, url: string, fileType: string, notebookId: number, createdAt: string, updatedAt: string}>}
+ */
+export const getFileUrlByNoteId = (noteId) => {
+    // 后端使用 @RequestParam，所以使用查询参数
+    return service.post(`/noting/notes/files/id_url`, null, {
+        params: { noteId: noteId }
+    })
+        .then(res => res.data.data);
+};
+
+// =========================================================
+//                        笔记统计 API
+// =========================================================
+
+/**
+ * [对应后端: GET /noting/note-stats/{noteId}]
+ * 获取笔记统计信息 (返回 NoteStatsVO)
+ * @param {number} noteId - 笔记ID
+ */
+export const getNoteStats = (noteId) => {
+    return service.get(`/noting/note-stats/${noteId}`)
+        .then(res => res.data.data);
+};
+
+/**
+ * [对应后端: POST /noting/note-stats/change]
+ * 变更笔记统计字段（views/likes/favorites/comments）
+ * @param {number} noteId - 笔记ID
+ * @param {number} userId - 用户ID
+ * @param {string} field - 字段名：views | likes | favorites | comments
+ * @param {number} delta - 变化值，默认+1，可传-1做撤销
+ */
+export const changeNoteStat = (noteId, userId, field, delta = 1) => {
+    return service.post('/noting/note-stats/change', null, {
+        params: { noteId, userId, field, delta }
+    }).then(res => res.data.data);
+};
+
+// =========================================================
+//                        搜索 API
+// =========================================================
+
+/**
+ * [对应后端: POST /api/v1/search/notes]
+ * 搜索笔记 (返回 List<NoteSearchVO>)
+ * @param {string} keyword - 搜索关键词
+ * @param {number} userId - 用户ID
+ */
+export const searchNotes = (keyword, userId) => {
+    const requestBody = {
+        keyword: keyword,
+        userId: userId
+    };
+    return service.post('/search/notes', requestBody)
+        .then(res => res.data.data);
+};
+
+/**
+ * [对应后端: GET /hot/notes]
+ * 获取热门笔记榜单 (返回 List<NoteSearchVO>)
+ */
+export const getHotNotes = () => {
+    return service.get('/hot/notes')
+        .then(res => res.data.data);
+};
+
+/**
+ * [对应后端: GET /recommend/notes]
+ * 获取推荐笔记列表 (返回 List<NoteSearchVO>)
+ * @param {number} userId - 用户ID
+ * @param {number} topN - 返回条数，默认 10
+ */
+export const getRecommendedNotes = (userId, topN = 10) => {
+    return service.get('/recommend/notes', {
+        params: { userId, topN }
+    }).then(res => res.data.data);
+};

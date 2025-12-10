@@ -79,12 +79,13 @@
           <button class="download-btn" @click="handleAction('下载', currentNote.id)">下载文件</button>
         </header>
         <div class="file-content">
-          <VuePdfEmbed
-              v-if="pdfPreviewUrl"
-              :source="pdfPreviewUrl"
-              class="pdf-embed-viewer"
-              :width="700"
-          />
+          <div v-if="pdfPreviewUrl" class="pdf-wrapper">
+            <VuePdfEmbed
+                :source="pdfPreviewUrl"
+                class="pdf-embed-viewer"
+                :width="700"
+            />
+          </div>
           <p v-else>正在加载 PDF 文件...</p>
         </div>
       </div>
@@ -333,12 +334,12 @@ import Underline from '@tiptap/extension-underline';
 import TaskList from '@tiptap/extension-task-list';
 import { TaskItem } from '@tiptap/extension-task-item';
 import Highlight from '@tiptap/extension-highlight';
-import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import TurndownService from 'turndown';
 import { debounce } from 'lodash-es';
 import VuePdfEmbed from 'vue-pdf-embed'
 import MarkdownIt from 'markdown-it';
+import { ResizableImage } from '@/extensions/ResizableImage';
 
 
 // 引入真实的 API 接口
@@ -359,9 +360,10 @@ const props = defineProps({
   spaceId: Number,
   notebookId: Number,
   notebookName: String,
-  notebookList: Array
+  notebookList: Array,
+  initialNoteId: Number  // 初始选中的笔记ID
 });
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'note-selected']);
 
 // ----------------- 状态管理 -----------------
 const showNoteMenuId = ref(null);
@@ -394,15 +396,28 @@ const turndownService = new TurndownService({
   codeBlockStyle: 'fenced'
 });
 
-// 确保 Turndown 保留图片
+// 确保 Turndown 保留图片（包括尺寸信息）
 turndownService.addRule('keepImages', {
   filter: ['img'],
   replacement: function (content, node) {
     const alt = node.alt || '';
     const src = node.getAttribute('src') || '';
-    const title = node.title ? ` "${node.title}"` : '';
-    // 转换为 Markdown 图片语法
-    return `![${alt}](${src}${title})`;
+    const width = node.getAttribute('width');
+    const height = node.getAttribute('height');
+    const title = node.title || '';
+    
+    // 如果有尺寸信息，使用 HTML 格式保留
+    if (width || height) {
+      let htmlAttrs = '';
+      if (width) htmlAttrs += ` width="${width}"`;
+      if (height) htmlAttrs += ` height="${height}"`;
+      if (title) htmlAttrs += ` title="${title}"`;
+      return `<img src="${src}" alt="${alt}"${htmlAttrs}>`;
+    }
+    
+    // 否则使用标准 Markdown 格式
+    const titlePart = title ? ` "${title}"` : '';
+    return `![${alt}](${src}${titlePart})`;
   }
 });
 
@@ -456,6 +471,11 @@ const debouncedUpdateNote = debounce(async (meta, file) => {
     // 更新本地的 updatedAt 状态，给用户反馈
     if (currentNote.value && currentNote.value.id === updatedVo.id) {
       currentNote.value.updatedAt = updatedVo.updatedAt;
+      // 同步更新 noteList 中对应笔记的信息
+      const noteInList = noteList.value.find(n => n.id === updatedVo.id);
+      if (noteInList) {
+        Object.assign(noteInList, updatedVo);
+      }
     }
 
     isLoading.value = false;
@@ -472,13 +492,53 @@ const editor = useEditor({
   extensions: [
     StarterKit, Underline, TaskList,
     TaskItem.configure({ nested: true }), Highlight.configure({ multicolor: true }),
-    Image.configure({ inline: true, allowBase64: true }),
+    ResizableImage.configure({ 
+      inline: true, 
+      allowBase64: true,
+      HTMLAttributes: {
+        class: 'resizable-image',
+      },
+    }),
     Placeholder.configure({ placeholder: '输入内容，输入 / 唤起菜单...' }),
   ],
   editorProps: {
     attributes: {
       // 移除原有的 prose 类，使用自定义样式
       class: 'prose-container focus:outline-none',
+    },
+    handlePaste: (view, event, slice) => {
+      // 处理粘贴事件
+      const items = Array.from(event.clipboardData?.items || [])
+      const imageItem = items.find(item => {
+        const type = item.type || ''
+        return type.indexOf('image') !== -1
+      })
+      
+      if (imageItem) {
+        event.preventDefault()
+        event.stopPropagation()
+        
+        const file = imageItem.getAsFile()
+        if (file && file.size > 0) {
+          // 确保编辑器存在且当前笔记类型正确
+          if (currentNoteType.value !== 'md') {
+            alert('请先选择一个富文本笔记进行编辑。')
+            return true
+          }
+          
+          // 异步处理图片上传和插入
+          handlePastedImage(file).catch(error => {
+            console.error('粘贴图片失败:', error)
+            alert('图片粘贴失败：' + (error.message || '请稍后重试'))
+          })
+          
+          return true // 阻止默认粘贴行为
+        } else {
+          console.warn('粘贴的图片文件无效或为空')
+        }
+      }
+      
+      return false // 允许其他内容正常粘贴
     },
   },
   onUpdate: ({ editor }) => {
@@ -537,10 +597,18 @@ const saveNoteContent = async () => {
     // 【API调用点 B】: 手动保存笔记内容 (PUT /noting/notes/update)
     const updatedVo = await updateNote(meta, mdFile);
 
-    if (updatedVo && updatedVo.updatedAt) {
-      currentNote.value.updatedAt = updatedVo.updatedAt;
-    } else {
-      currentNote.value.updatedAt = new Date().toISOString();
+    if (updatedVo) {
+      // 更新 currentNote
+      if (updatedVo.updatedAt) {
+        currentNote.value.updatedAt = updatedVo.updatedAt;
+      } else {
+        currentNote.value.updatedAt = new Date().toISOString();
+      }
+      // 同步更新 noteList 中对应笔记的信息
+      const noteInList = noteList.value.find(n => n.id === updatedVo.id);
+      if (noteInList) {
+        Object.assign(noteInList, updatedVo);
+      }
     }
 
     alert('笔记内容保存成功！');
@@ -567,8 +635,16 @@ const fetchNotes = async (sortBy = 'updatedAt') => {
     const notes = await fetchNotesByNotebook(props.notebookId);
     noteList.value = notes;
 
-    // 默认选中第一个笔记或保持现有选中状态
-    if (!currentNote.value && noteList.value.length > 0) {
+    // 优先选中初始笔记ID，否则选中第一个笔记或保持现有选中状态
+    if (props.initialNoteId) {
+      const targetNote = noteList.value.find(n => n.id === props.initialNoteId);
+      if (targetNote) {
+        selectNote(targetNote);
+      } else if (noteList.value.length > 0) {
+        // 如果初始笔记ID不存在，选中第一个
+        selectNote(noteList.value[0]);
+      }
+    } else if (!currentNote.value && noteList.value.length > 0) {
       selectNote(noteList.value[0]);
     } else if (currentNote.value) {
       const updatedNote = noteList.value.find(n => n.id === currentNote.value.id);
@@ -782,10 +858,16 @@ const fetchFileContentByUrl = async (url) => {
 };
 
 const selectNote = async (note) => {
+  // 如果切换回同一个笔记，需要强制重新获取内容
+  const isSameNote = currentNote.value && currentNote.value.id === note.id;
+  
   currentNote.value = note;
   currentTitle.value = note.title;
   currentNoteType.value = note.fileType;
   pdfPreviewUrl.value = null;
+  
+  // 通知父组件当前选中的笔记ID
+  emit('note-selected', note.id);
 
   // 1. 获取文件名 (假设 note 对象中包含文件名)
   const fileName = note.filename;
@@ -798,20 +880,26 @@ const selectNote = async (note) => {
 
   try {
     // 2. 获取 MinIO 文件 URL
+    // 如果是同一个笔记，添加时间戳参数强制刷新缓存
     const fileUrl = await getFileUrl(fileName);
     if (!fileUrl) {
       throw new Error('Failed to get file URL.');
     }
 
+    // 如果是同一个笔记，添加时间戳参数强制刷新缓存
+    const urlWithCacheBuster = isSameNote 
+      ? `${fileUrl}${fileUrl.includes('?') ? '&' : '?'}_t=${Date.now()}`
+      : fileUrl;
+
     if (note.fileType === 'pdf') {
       // 3. 处理 PDF 预览
       // PDF 只需要 URL。您需要将这个 URL 传递给您集成的 PDF 预览组件。
-      pdfPreviewUrl.value = fileUrl;
+      pdfPreviewUrl.value = urlWithCacheBuster;
       // 记得在模板中绑定这个 URL 到 PDF 预览组件
-      console.log(`PDF Preview URL: ${fileUrl}`);
+      console.log(`PDF Preview URL: ${urlWithCacheBuster}`);
     } else if (note.fileType === 'md' && editor.value) {
       // 4. 处理 Markdown 文件
-      const markdownContent = await fetchFileContentByUrl(fileUrl);
+      const markdownContent = await fetchFileContentByUrl(urlWithCacheBuster);
       const htmlContent = mdParser.render(markdownContent || '');
       editor.value.commands.setContent(htmlContent, false);
       nextTick(() => {
@@ -1059,20 +1147,137 @@ const handleImageUpload = async (e) => {
   const file = e.target.files[0];
   if (!file || !editor.value) return;
 
+  await insertImage(file);
+  
+  // 清空 input，防止无法连续上传同一张图
+  e.target.value = null;
+};
+
+// 处理粘贴的图片
+const handlePastedImage = async (file) => {
+  if (!file) {
+    console.warn('粘贴的文件无效')
+    return;
+  }
+  
+  if (!editor.value) {
+    console.warn('编辑器未初始化')
+    alert('编辑器未准备好，请稍后再试')
+    return;
+  }
+  
+  console.log('开始处理粘贴的图片，文件大小:', file.size, '文件类型:', file.type)
+  await insertImage(file);
+};
+
+// 统一的图片插入函数
+const insertImage = async (file) => {
+  if (!editor.value) {
+    console.warn('编辑器未初始化')
+    return;
+  }
+
   try {
+    console.log('开始上传图片...')
     // 【API调用点 J】: 上传图片并获取 URL (POST /noting/notes/image)
     const imageUrl = await uploadImage(file);
+    console.log('图片上传成功，URL:', imageUrl)
 
-    // 将返回的 URL 插入到编辑器中
-    if (imageUrl) {
-      editor.value.chain().focus().setImage({ src: imageUrl }).run();
+    if (!imageUrl) {
+      throw new Error('图片上传失败，未返回 URL')
     }
+
+    // 获取图片的原始尺寸（使用 Promise 包装）
+    const getImageDimensions = (url) => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous'; // 允许跨域加载
+        let resolved = false;
+        
+        img.onload = () => {
+          if (!resolved) {
+            resolved = true;
+            console.log('图片尺寸获取成功:', img.naturalWidth, 'x', img.naturalHeight)
+            resolve({
+              width: img.naturalWidth,
+              height: img.naturalHeight
+            });
+          }
+        };
+        img.onerror = () => {
+          if (!resolved) {
+            resolved = true;
+            // 如果无法加载图片尺寸，返回 null（不阻塞插入）
+            console.warn('无法获取图片尺寸，将使用默认尺寸');
+            resolve(null);
+          }
+        };
+        // 设置超时，避免长时间等待
+        setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            console.warn('获取图片尺寸超时');
+            resolve(null);
+          }
+        }, 3000);
+        img.src = url;
+      });
+    };
+
+    // 等待图片尺寸加载完成（最多等待3秒）
+    const dimensions = await getImageDimensions(imageUrl);
+    
+    // 插入图片，设置合理的默认尺寸
+    const imageAttrs = { src: imageUrl };
+    
+    // 设置最大显示宽度（可以根据需要调整）
+    const MAX_DISPLAY_WIDTH = 800; // 最大显示宽度 800px
+    const MAX_DISPLAY_HEIGHT = 600; // 最大显示高度 600px
+    
+    if (dimensions && dimensions.width && dimensions.height) {
+      // 计算缩放后的尺寸，保持宽高比
+      let displayWidth = dimensions.width;
+      let displayHeight = dimensions.height;
+      
+      // 如果宽度超过最大宽度，按比例缩放
+      if (displayWidth > MAX_DISPLAY_WIDTH) {
+        const ratio = MAX_DISPLAY_WIDTH / displayWidth;
+        displayWidth = MAX_DISPLAY_WIDTH;
+        displayHeight = Math.round(displayHeight * ratio);
+      }
+      
+      // 如果高度仍然超过最大高度，再次按比例缩放
+      if (displayHeight > MAX_DISPLAY_HEIGHT) {
+        const ratio = MAX_DISPLAY_HEIGHT / displayHeight;
+        displayHeight = MAX_DISPLAY_HEIGHT;
+        displayWidth = Math.round(displayWidth * ratio);
+      }
+      
+      imageAttrs.width = displayWidth;
+      imageAttrs.height = displayHeight;
+      
+      console.log(`图片尺寸: 原始 ${dimensions.width}x${dimensions.height}, 显示 ${displayWidth}x${displayHeight}`)
+    } else {
+      // 如果无法获取尺寸，使用默认尺寸
+      imageAttrs.width = MAX_DISPLAY_WIDTH;
+      imageAttrs.height = MAX_DISPLAY_HEIGHT;
+      console.log('使用默认图片尺寸:', MAX_DISPLAY_WIDTH, 'x', MAX_DISPLAY_HEIGHT)
+    }
+    
+    console.log('准备插入图片，属性:', imageAttrs)
+    // 插入图片到编辑器
+    editor.value.chain().focus().setImage(imageAttrs).run();
+    
+    // 验证图片是否插入成功
+    const htmlContent = editor.value.getHTML();
+    const hasImage = htmlContent.includes(imageUrl);
+    console.log('图片插入成功，HTML 中包含图片:', hasImage)
+    console.log('当前编辑器 HTML 内容:', htmlContent.substring(0, 500))
+      
   } catch (error) {
-    alert('图片上传失败，请稍后重试。');
     console.error('Error uploading image:', error);
-  }finally {
-    // 清空 input，防止无法连续上传同一张图
-    e.target.value = null;
+    alert('图片上传失败：' + (error.message || '请稍后重试'));
+    throw error; // 重新抛出错误以便调用者处理
   }
 };
 
@@ -1492,10 +1697,17 @@ const toggleInsertMenu = () => showInsertMenu.value = !showInsertMenu.value;
   background: #4c7cff;
   color: white;
   display: flex;
+  flex-direction: row;
   align-items: center;
+  justify-content: center;
   cursor: pointer;
   font-size: 14px;
   transition: background-color 0.2s;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  direction: ltr;
+  white-space: nowrap;
+  min-width: fit-content;
 }
 
 .insert-pill-btn:hover {
@@ -1518,6 +1730,12 @@ const toggleInsertMenu = () => showInsertMenu.value = !showInsertMenu.value;
   left: 50%;
   transform: translateX(-50%);
   min-width: 120px;
+}
+
+.insert-menu .menu-item {
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  direction: ltr;
 }
 
 .insert-menu .emoji {
@@ -1635,6 +1853,41 @@ const toggleInsertMenu = () => showInsertMenu.value = !showInsertMenu.value;
   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
+/* 图片包装器样式 */
+:deep(.image-wrapper) {
+  display: inline-block;
+  position: relative;
+  max-width: 100%;
+  margin: 10px auto;
+  text-align: center;
+}
+
+:deep(.image-wrapper:hover .image-resize-handle) {
+  opacity: 1;
+}
+
+/* 调整大小控制点样式 */
+:deep(.image-resize-handle) {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  background: #4c7cff;
+  border: 2px solid white;
+  border-radius: 50%;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+:deep(.image-resize-handle:hover) {
+  background: #3a68e0;
+  transform: scale(1.2);
+}
+
 /* --- PDF 预览样式 --- */
 .file-preview-container {
   flex: 1;
@@ -1685,13 +1938,29 @@ const toggleInsertMenu = () => showInsertMenu.value = !showInsertMenu.value;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start; /* 从顶部开始对齐 */
   min-height: 0; /* 【关键强化】防止 flex item 因内容过多而溢出 */
+  /* 确保PDF内容不被头部栏遮挡 */
+  scroll-padding-top: 0;
+}
+
+.pdf-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  /* 确保PDF内容有足够的顶部间距，避免被头部栏遮挡 */
+  padding-top: 0;
 }
 
 .pdf-embed-viewer {
   max-width: 100%;
   height: auto;
+  margin: 0 auto;
+  display: block;
+  /* 确保PDF内容不被遮挡 */
+  position: relative;
+  z-index: 1;
 }
 
 /* ================================================= */

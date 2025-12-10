@@ -4,7 +4,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import request from '../api/request'
 import AuthView from '../views/AuthView.vue'
 import MainView from '../views/MainView.vue'
-import AdminView from '../views/AdminView.vue'
 import { useUserStore } from '@/stores/user' // 导入 Pinia Store
 
 const routes = [
@@ -12,8 +11,7 @@ const routes = [
   { path: '/login', name: 'Login', component: AuthView },
   { path: '/register', name: 'Register', component: AuthView },
   { path: '/forgot-password', name: 'ForgotPassword', component: AuthView },
-  { path: '/main', name: 'Main', component: MainView, meta: { requiresAuth: true } },
-  { path: '/admin', name: 'Admin', component: AdminView, meta: { requiresAuth: true, requiresAdmin: true } }
+  { path: '/main', name: 'Main', component: MainView, meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({
@@ -58,12 +56,6 @@ router.beforeEach(async (to, from, next) => {
       // 使用 setUserData 更新用户信息 (Token 已经在上面解码时设置过了)
       // 注意：res.data 应该是后端 /auth/me 接口返回的用户对象
       userStore.setUserData(res.data)
-
-      // 核心修改 2: 检查是否需要管理员权限
-      if (to.meta.requiresAdmin && res.data.role !== 'ADMIN') { // 假设权限角色字段为 role
-        // 如果需要管理员权限但当前用户不是管理员，重定向到主页
-        return next('/main')
-      }
 
       next()  // 验证成功，继续
     } catch (err) {
