@@ -15,14 +15,14 @@ public class RemarkScheduledTasks {
     private final RemarkService remarkService;
 
 
-    @Scheduled(cron = "0 */1 * * * *")
+    @Scheduled(cron = "0 */5 * * * *")
     public void flushRedisLikeCountToMQ() {
         log.info("sending message 1");
         remarkService.flushLikeCountToMQ();
     }
 
 
-    @Scheduled(cron = "0 */1 * * * *")
+    @Scheduled(cron = "0 */5 * * * *")
     public void flushRedisLikeUsersToMQ() {
         log.info("sending message 2");
         remarkService.flushLikeUsersToMQ();

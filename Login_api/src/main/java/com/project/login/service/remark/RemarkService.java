@@ -640,7 +640,6 @@ public class RemarkService {
 
                 // 2. 获取 Redis Set 中所有用户
                 Set<Object> redisSet = redisTemplate.opsForSet().members(key);
-                log.info(redisSet.toString());
                 Set<Long> userSet = new HashSet<>();
                 if (!redisSet.isEmpty()) {
                     userSet = redisSet.stream()
