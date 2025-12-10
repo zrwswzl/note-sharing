@@ -2,7 +2,6 @@ package com.project.login.model.vo;
 
 import lombok.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 
@@ -36,7 +35,7 @@ public class RemarkVO {
     private Long likeCount;
 
     /** 是否是回复 **/
-    private Boolean isReceive;
+    private Boolean isReply;
 
     /** 子评论（仅一层） */
     private List<RemarkVO> replies;

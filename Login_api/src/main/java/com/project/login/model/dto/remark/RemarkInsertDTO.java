@@ -1,7 +1,5 @@
 package com.project.login.model.dto.remark;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -25,7 +23,7 @@ public class RemarkInsertDTO {
 
     private String parentId; // 父评论（楼中楼）
 
-    private Boolean isReceive;
+    private Boolean isReply;
 
-    private String receiveToRemarkId;
+    private String replyToRemarkId;
 }

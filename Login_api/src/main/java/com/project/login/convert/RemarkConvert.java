@@ -20,9 +20,6 @@ public interface RemarkConvert {
     // Mapper 实例
     RemarkConvert INSTANCE = Mappers.getMapper(RemarkConvert.class);
 
-    RemarkDeleteDTO toDeleteDTO(RemarkDeleteRequest req);
-    RemarkInsertDTO toInsertDTO(RemarkInsertRequest req);
-    RemarkSelectByNoteDTO toSelectDTO(RemarkInsertRequest req);
 
     @Mapping(target = "_id", ignore = true) // _id 是由 MongoDB 自动生成的
     @Mapping(target = "createdAt", ignore = true) // 默认设置创建时间为当前时间
@@ -34,7 +31,7 @@ public interface RemarkConvert {
             @Mapping(source = "content", target = "content"), // 映射 content
             @Mapping(source = "createdAt", target = "createdAt"), // 映射 createdAt
             @Mapping(source = "parentId", target = "parentId"), // 映射 parentId
-            @Mapping(source = "isReceive", target = "isReceive"), // 映射 isReceive
+            @Mapping(source = "isReply", target = "isReply"), // 映射 isReceive
             @Mapping(target = "username",ignore = true),
             @Mapping(target = "likeCount",ignore=true),
             @Mapping(source = "replyToUsername",target ="replyToUsername"), // 使用 getReplyToUsername 方法填充 replyToUsername

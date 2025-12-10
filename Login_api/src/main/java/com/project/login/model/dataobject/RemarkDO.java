@@ -1,15 +1,10 @@
 package com.project.login.model.dataobject;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.*;
-import org.bson.types.ObjectId;
-import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
-
-import java.time.LocalDateTime;
 
 
 @Data
@@ -40,11 +35,11 @@ public class RemarkDO {
     @Field("parent_id") // 映射为 parent_id
     private String parentId; // 上一级评论（楼中楼）
 
-    @Field("is_receive") // 映射为 is_receive
-    private Boolean isReceive; // 是否是回复
+    @Field("is_reply") // 映射为 is_reply
+    private Boolean isReply; // 是否是回复
 
-    @Field("receive_to_remark_id") // 映射为 receive_to_remark_id
-    private String receiveToRemarkId; // 回复哪条评论
+    @Field("reply_to_remark_id") // 映射为 reply_to_remark_id
+    private String replyToRemarkId; // 回复哪条评论
 
     @Field("reply_to_user_name")
     private String replyToUsername;
