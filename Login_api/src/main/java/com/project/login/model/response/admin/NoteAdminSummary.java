@@ -1,6 +1,8 @@
 package com.project.login.model.response.admin;
 
+import com.project.login.model.dataobject.NoteDO;
 import com.project.login.model.entity.NoteEntity;
+import com.project.login.model.entity.NoteOEntity;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,7 +18,7 @@ public class NoteAdminSummary {
     private String tag;
     private String preview;
 
-    public static NoteAdminSummary from(NoteEntity n) {
+    public static NoteAdminSummary from(NoteOEntity n) {
         String author = n.getAuthorName();
         String space = null;
         String notebook = null;

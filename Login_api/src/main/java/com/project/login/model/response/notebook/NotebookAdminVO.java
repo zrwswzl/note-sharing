@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class NotebookVO {
+public class NotebookAdminVO {
     private Long id;
     private String name;
     private Long spaceId;
@@ -18,8 +18,8 @@ public class NotebookVO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public static NotebookVO from(NotebookEntity e) {
-        return new NotebookVO(
+    public static NotebookAdminVO from(NotebookEntity e) {
+        return new NotebookAdminVO(
                 e.getId(),
                 e.getName(),
                 e.getSpace() != null ? e.getSpace().getId() : null,

@@ -11,5 +11,6 @@
         <module name="Login_api.main" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel target="25" />
   </component>
 </project>

@@ -34,9 +34,11 @@ public class CommentEntity {
     private CommentEntity parent;
 
     @Column(name = "likes", nullable = false)
+    @Builder.Default
     private Integer likes = 0;
 
     @Column(name = "replies", nullable = false)
+    @Builder.Default
     private Integer replies = 0;
 
     @Column(name = "created_at", nullable = false)

@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class NoteSpaceVO {
+public class NoteSpaceAdminVO {
     private Long id;
     private String name;
     private Long userId;
@@ -18,8 +18,8 @@ public class NoteSpaceVO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
-    public static NoteSpaceVO from(NoteSpaceEntity e) {
-        return new NoteSpaceVO(
+    public static NoteSpaceAdminVO from(NoteSpaceEntity e) {
+        return new NoteSpaceAdminVO(
                 e.getId(),
                 e.getName(),
                 e.getUser() != null ? e.getUser().getId() : null,

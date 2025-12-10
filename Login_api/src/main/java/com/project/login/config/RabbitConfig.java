@@ -1,14 +1,24 @@
 package com.project.login.config;
 
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.listener.RabbitListenerContainerFactory;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class RabbitConfig {
+
+    @Bean(name = "auditListenerFactory")
+    public RabbitListenerContainerFactory<?> rabbitListenerContainerFactory(ConnectionFactory connectionFactory) {
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        return factory;
+    }
 
     // --- 连接工厂 ---
     @Bean
@@ -58,5 +68,10 @@ public class RabbitConfig {
     @Bean
     public Queue questionEsQueue() {
         return new Queue("question.es.queue", true); // durable queue
+    }
+
+    @Bean
+    public Queue noteAuditQueue() {
+        return new Queue("note.audit.queue", true);  // true 表示队列持久化
     }
 }
