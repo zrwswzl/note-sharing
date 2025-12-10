@@ -24,6 +24,13 @@ public interface NotebookMapper {
     })
     NotebookDO selectById(Long id);
 
+    // 通过 notebookId 查询 noteSpaceId
+    @Select("SELECT space_id FROM notebooks WHERE id = #{id} LIMIT 1")
+    Long selectSpaceIdByNotebookId(Long id);
+
+    @Select("SELECT tag_id FROM notebooks WHERE id = #{notebookId} LIMIT 1")
+    Long selectNotebookTagIdByNotebookId(Long notebookId);
+
     @Select("SELECT id, name, space_id, tag_id, created_at, updated_at " +
             "FROM notebooks WHERE space_id = #{spaceId}")
     @ResultMap("NotebookBaseResultMap")

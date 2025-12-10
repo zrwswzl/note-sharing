@@ -1,11 +1,7 @@
 package com.project.login.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper; // 别忘了导包
 import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
-import org.springframework.amqp.rabbit.connection.ConnectionFactory;
-import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.context.annotation.Bean;
@@ -25,17 +21,16 @@ public class RabbitConfig {
 
     // --- RabbitTemplate ---
     @Bean
-    public RabbitTemplate rabbitTemplate(CachingConnectionFactory connectionFactory,
-            Jackson2JsonMessageConverter converter) { // 1. 这里直接注入转换器
+    public RabbitTemplate rabbitTemplate(CachingConnectionFactory connectionFactory) {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
-        template.setMessageConverter(converter); // 2. 直接使用注入进来的变量，而不是调用方法
+        template.setMessageConverter(jacksonMessageConverter()); // 使用 JSON
         return template;
     }
 
     // --- JSON 消息转换器 ---
     @Bean
-    public Jackson2JsonMessageConverter jacksonMessageConverter(ObjectMapper objectMapper) {
-        return new Jackson2JsonMessageConverter(objectMapper);
+    public Jackson2JsonMessageConverter jacksonMessageConverter() {
+        return new Jackson2JsonMessageConverter();
     }
 
     // ---------------- 队列 ----------------
@@ -54,25 +49,14 @@ public class RabbitConfig {
         return new Queue("note.mongo.queue", true);
     }
 
+    public static final String USER_BEHAVIOR_QUEUE = "user_behavior_queue";
     @Bean
-    public Queue noteAuditQueue() {
-        return new Queue("note.audit.queue", true);
+    public Queue userBehaviorQueue() {
+        return new Queue(USER_BEHAVIOR_QUEUE, true); // durable queue
     }
 
     @Bean
-    public Queue noteModerationAlertQueue() {
-        return new Queue("note.moderation.alert.queue", true);
-    }
-
-    @Bean
-    public SimpleRabbitListenerContainerFactory auditListenerFactory(ConnectionFactory connectionFactory,
-                                                                     Jackson2JsonMessageConverter converter) {
-        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
-        factory.setConnectionFactory(connectionFactory);
-        factory.setAcknowledgeMode(AcknowledgeMode.AUTO);
-        factory.setPrefetchCount(1);
-        factory.setDefaultRequeueRejected(false);
-        factory.setMessageConverter(converter);
-        return factory;
+    public Queue questionEsQueue() {
+        return new Queue("question.es.queue", true); // durable queue
     }
 }

@@ -7,6 +7,7 @@ import java.util.Optional;
 
 public interface VerificationTokenRepository extends JpaRepository<VerificationTokenEntity, Long> {
 
-    Optional<VerificationTokenEntity> findTopByEmailAndTypeOrderByCreatedAtDesc(String email, String type);
+    Optional<VerificationTokenEntity> findByEmailAndTypeOrderByCreatedAtDesc(String email, String type);
 
+    VerificationTokenEntity findByEmailAndType(String email, String type);
 }

@@ -6,16 +6,14 @@ import com.project.login.model.dataobject.*;
 import com.project.login.model.dto.note.*;
 import com.project.login.model.event.EsNoteEvent;
 import com.project.login.model.event.NoteActionType;
+import com.project.login.model.vo.NoteShowVO;
 import com.project.login.model.vo.NoteVO;
 import com.project.login.service.minio.MinioService;
-import com.project.login.service.tag.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
@@ -29,16 +27,21 @@ public class NoteService {
     private final NoteMapper noteMapper;
     private final NotebookMapper notebookMapper;
     private final NoteSpaceMapper notespaceMapper;
+    private final NoteStatsMapper noteStatsMapper;
     private final UserMapper userMapper;
     private final MinioService minioservice;
-    private final TagService tagService;
     private final NoteEventPublisher eventPublisher;
     private final ContentSummaryService contentSummaryService;
-    private final com.project.login.service.sensitive.FastFilterService fastFilterService;
 
     @Qualifier("noteConvert")
     private final NoteConvert convert;
-    private final TagMapper tagMapper;
+
+    private String getAuthorName(Long id) {
+        Long bookId = noteMapper.selectNotebookIdByNoteId(id);
+        Long spaceId = notebookMapper.selectSpaceIdByNotebookId(bookId);
+        Long userId = notespaceMapper.selectUserIdBySpaceId(spaceId);
+        return userMapper.selectNameById(userId);
+    }
 
 
     @Transactional
@@ -51,11 +54,6 @@ public class NoteService {
         // 上传文件并获取文件名和URL
         MultipartFile file = dto.getFile();
         String contentSummary = contentSummaryService.extractContentSummary(file);
-        String quickText_create = contentSummaryService.extractQuickFilterText(file);
-        List<String> hits_create = fastFilterService.match(quickText_create);
-        if (!hits_create.isEmpty()) {
-            throw new RuntimeException("命中违禁词: " + hits_create.toString());
-        }
 
         //minio 名字
         String name = minioservice.uploadFile(file);
@@ -72,6 +70,19 @@ public class NoteService {
 
         noteMapper.insert(note);
 
+        NoteStatsDO stats = NoteStatsDO.builder()
+                .noteId(note.getId())
+                .authorName(getAuthorName(note.getId()))
+                .views(0L)
+                .likes(0L)
+                .favorites(0L)
+                .comments(0L)
+                .lastActivityAt(LocalDateTime.now())
+                .version(0L)
+                .updatedAt(LocalDateTime.now())
+                .build();
+        noteStatsMapper.insert(stats);
+
         // --- 发布异步更新 ES 事件 ---
         EsNoteEvent event = new EsNoteEvent();
         event.setNoteId(note.getId());
@@ -80,21 +91,7 @@ public class NoteService {
         event.setTitle(note.getTitle());
         event.setContentSummary(contentSummary);
 
-        NotebookDO notebook = notebookMapper.selectById(dto.getMeta().getNotebookId());
-        NoteSpaceDO notespace = notespaceMapper.selectById(notebook.getSpaceId());
-        UserDO user = userMapper.selectById(notespace.getUserId());
-        event.setAuthorName(user.getUsername());
-
-        event.setUpdatedAt(LocalDateTime.now());
-
-        Long auditNoteId = note.getId();
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                eventPublisher.sendEsNoteEvent(event);
-                eventPublisher.sendAuditNoteEvent(auditNoteId);
-            }
-        });
+        eventPublisher.sendEsNoteEvent(event);
 
         return convert.toVO(note);
     }
@@ -109,11 +106,6 @@ public class NoteService {
         // 上传文件并获取文件名和URL
         MultipartFile file = dto.getFile();
         String contentSummary = contentSummaryService.extractContentSummary(file);
-        String quickText_update = contentSummaryService.extractQuickFilterText(file);
-        List<String> hits_update = fastFilterService.match(quickText_update);
-        if (!hits_update.isEmpty()) {
-            throw new RuntimeException("命中违禁词: " + hits_update.toString());
-        }
         String name = minioservice.uploadFile(file);
 
         existing.setTitle(dto.getMeta().getTitle());
@@ -123,6 +115,12 @@ public class NoteService {
 
         noteMapper.update(existing);
 
+        NoteStatsDO stats = noteStatsMapper.getById(existing.getId());
+        if (stats != null) {
+            stats.setUpdatedAt(LocalDateTime.now());
+            noteStatsMapper.updateOptimistic(stats);
+        }
+
         // --- 发布异步更新 ES 事件 ---
         EsNoteEvent event = new EsNoteEvent();
         event.setNoteId(existing.getId());
@@ -131,16 +129,7 @@ public class NoteService {
         event.setTitle(existing.getTitle());
         event.setContentSummary(contentSummary);
 
-        event.setUpdatedAt(LocalDateTime.now());
-
-        Long auditNoteId2 = existing.getId();
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                eventPublisher.sendEsNoteEvent(event);
-                eventPublisher.sendAuditNoteEvent(auditNoteId2);
-            }
-        });
+        eventPublisher.sendEsNoteEvent(event);
 
         return convert.toVO(existing);
     }
@@ -155,19 +144,14 @@ public class NoteService {
 
         noteMapper.deleteById(dto.getNoteId());
 
+        noteStatsMapper.deleteById(dto.getNoteId());
+
         // --- 发布异步更新 ES 事件 ---
         EsNoteEvent event = new EsNoteEvent();
         event.setNoteId(existing.getId());
         event.setAction(NoteActionType.DELETE);
 
-        Long auditNoteId3 = existing.getId();
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                eventPublisher.sendEsNoteEvent(event);
-                eventPublisher.sendAuditNoteEvent(auditNoteId3);
-            }
-        });
+        eventPublisher.sendEsNoteEvent(event);
     }
 
 
@@ -192,8 +176,6 @@ public class NoteService {
 
     @Transactional(readOnly = true)
     public List<NoteVO> getNotesByNotebook(NoteListByNotebookDTO dto) {
-
-
         if (notebookMapper.selectById(dto.getNotebookID()) == null) {
             throw new RuntimeException("笔记本不存在");
         }
@@ -212,11 +194,6 @@ public class NoteService {
         // 上传文件并获取文件名和URL
         MultipartFile file = dto.getFile();
         String contentSummary = contentSummaryService.extractContentSummary(file);
-        String quickText_upload = contentSummaryService.extractQuickFilterText(file);
-        List<String> hits_upload = fastFilterService.match(quickText_upload);
-        if (!hits_upload.isEmpty()) {
-            throw new RuntimeException("命中违禁词: " + hits_upload.toString());
-        }
         String name = minioservice.uploadFile(file);
         String url = minioservice.getFileUrl(name);
 
@@ -231,22 +208,26 @@ public class NoteService {
 
         noteMapper.insert(note);
 
+        // --- 初始化 note_stats ---
+        NoteStatsDO stats = NoteStatsDO.builder()
+                .noteId(note.getId())
+                .authorName(getAuthorName(note.getId()))
+                .views(0L)
+                .likes(0L)
+                .favorites(0L)
+                .comments(0L)
+                .lastActivityAt(LocalDateTime.now())
+                .version(0L)
+                .updatedAt(LocalDateTime.now())
+                .build();
+        noteStatsMapper.insert(stats);
+
         // --- 发布异步更新 ES 事件 ---
         EsNoteEvent event = new EsNoteEvent();
         event.setNoteId(note.getId());
         event.setAction(NoteActionType.CREATE);
-
         event.setTitle(note.getTitle());
         event.setContentSummary(contentSummary);
-
-        NotebookDO notebook = notebookMapper.selectById(dto.getMeta().getNotebookId());
-        NoteSpaceDO notespace = notespaceMapper.selectById(notebook.getSpaceId());
-
-        UserDO user = userMapper.selectById(notespace.getUserId());
-        event.setAuthorName(user.getUsername());
-
-        event.setUpdatedAt(LocalDateTime.now());
-
         eventPublisher.sendEsNoteEvent(event);
 
         return convert.toVO(note);
@@ -257,6 +238,22 @@ public class NoteService {
     public String getFileUrl(NoteFileUrlDTO dto) {
         String url = minioservice.getFileUrl(dto.getFilename());
         return url;
+    }
+
+    @Transactional(readOnly = true)
+    public NoteShowVO getNoteByNoteId(Long noteId) {
+        NoteDO existing = noteMapper.selectById(noteId);
+        if (existing == null) throw new RuntimeException("笔记不存在");
+        String url = minioservice.getFileUrl(existing.getFilename());
+        NoteShowVO vo = new NoteShowVO();
+        vo.setId(existing.getId());
+        vo.setTitle(existing.getTitle());
+        vo.setUrl(url);
+        vo.setFileType(existing.getFileType());
+        vo.setNotebookId(existing.getNotebookId());
+        vo.setCreatedAt(existing.getCreatedAt());
+        vo.setUpdatedAt(existing.getUpdatedAt());
+        return vo;
     }
 
 
@@ -279,12 +276,16 @@ public class NoteService {
         note.setUpdatedAt(LocalDateTime.now());
         noteMapper.update(note);
 
+        NoteStatsDO stats = noteStatsMapper.getById(note.getId());
+        if (stats != null) {
+            stats.setAuthorName(getAuthorName(note.getId()));
+            noteStatsMapper.updateOptimistic(stats);
+        }
+
         EsNoteEvent event = new EsNoteEvent();
         event.setNoteId(note.getId());
         event.setAction(NoteActionType.UPDATE);
-
         event.setTitle(note.getTitle());
-
         eventPublisher.sendEsNoteEvent(event);
 
         return convert.toVO(note);

@@ -22,7 +22,7 @@ public class TokenService {
 
         // 查询是否已有该邮箱 + 类型的验证码
         Optional<VerificationTokenEntity> existingToken = tokenRepository
-                .findTopByEmailAndTypeOrderByCreatedAtDesc(email, type);
+                .findByEmailAndTypeOrderByCreatedAtDesc(email, type);
 
         if (existingToken.isPresent()) {
             // 更新已有记录
@@ -42,12 +42,11 @@ public class TokenService {
 
     // 验证验证码
     public boolean validate(String email, String code, String type) {
-        Optional<VerificationTokenEntity> vt = tokenRepository
-                .findTopByEmailAndTypeOrderByCreatedAtDesc(email, type);
+        VerificationTokenEntity vt = tokenRepository.findByEmailAndType(email, type);
 
-        if (vt.isEmpty()) return false;
+        if (vt == null) return false;
 
-        VerificationTokenEntity token = vt.get();
-        return token.getToken().equals(code) && token.getExpiresAt().isAfter(Instant.now());
+        String token = vt.getToken();
+        return token.equals(code);
     }
 }

@@ -16,6 +16,9 @@ public interface TagMapper {
     })
     TagDO selectTagById(@Param("id") Long id);
 
+    @Select("SELECT name FROM tags WHERE id = #{id}")
+    String selectNameById(@Param("id") Long id);
+
     @Select("SELECT id, name FROM tags WHERE name = #{name}")
     @Results({
             @Result(column = "id", property = "id"),

@@ -7,41 +7,37 @@ import org.apache.ibatis.annotations.*;
 @Mapper
 public interface UserMapper {
 
-        @Select("SELECT id, username, password_hash AS passwordHash, enabled, studentNumber, email, " +
-                        "created_at AS createdAt, updated_at AS updatedAt " +
-                        "FROM users WHERE id = #{id}")
-        UserDO selectById(@Param("id") Long id);
+    @Select("SELECT id, username, password_hash AS passwordHash, enabled, studentNumber, email, " +
+            "created_at AS createdAt, updated_at AS updatedAt " +
+            "FROM users WHERE id = #{id}")
+    UserDO selectById(@Param("id") Long id);
 
-        @Select("SELECT id, username, password_hash AS passwordHash, enabled, studentNumber, email, " +
-                        "created_at AS createdAt, updated_at AS updatedAt " +
-                        "FROM users WHERE email = #{email}")
-        UserEntity selectByEmail(@Param("email") String email);
+    @Select("SELECT username " +
+            "FROM users WHERE id = #{id}")
+    String selectNameById(Long id);
 
-        @Select("SELECT id, username, password_hash AS passwordHash, enabled, studentNumber, email, " +
-                        "created_at AS createdAt, updated_at AS updatedAt " +
-                        "FROM users WHERE username = #{username}")
-        UserEntity selectByUsername(@Param("username") String username);
+    @Select("SELECT id, username, password_hash AS passwordHash, enabled, studentNumber, email, " +
+            "created_at AS createdAt, updated_at AS updatedAt " +
+            "FROM users WHERE email = #{email}")
+    UserEntity selectByEmail(@Param("email") String email);
 
-        @Insert("INSERT INTO users (username, password_hash, enabled, studentNumber, email, created_at, updated_at) " +
-                        "VALUES (#{username}, #{passwordHash}, #{enabled}, #{studentNumber}, #{email}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
-        @Options(useGeneratedKeys = true, keyProperty = "id")
-        void insertUser(UserEntity user);
+    @Select("SELECT id, username, password_hash AS passwordHash, enabled, studentNumber, email, " +
+            "created_at AS createdAt, updated_at AS updatedAt " +
+            "FROM users WHERE username = #{username}")
+    UserEntity selectByUsername(@Param("username") String username);
 
-        @Update("UPDATE users " +
-                        "SET username = #{username}, " +
-                        "    password_hash = #{passwordHash}, " +
-                        "    enabled = #{enabled}, " +
-                        "    studentNumber = #{studentNumber}, " +
-                        "    email = #{email}, " +
-                        "    updated_at = CURRENT_TIMESTAMP " +
-                        "WHERE id = #{id}")
-        void updateUser(UserEntity user);
+    @Insert("INSERT INTO users (username, password_hash, enabled, studentNumber, email, created_at, updated_at) " +
+            "VALUES (#{username}, #{passwordHash}, #{enabled}, #{studentNumber}, #{email}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")
+    @Options(useGeneratedKeys = true, keyProperty = "id")
+    void insertUser(UserEntity user);
 
-        @Select("SELECT id, username, password_hash AS passwordHash, enabled, studentNumber, email, " +
-                        "created_at AS createdAt, updated_at AS updatedAt " +
-                        "FROM users WHERE studentNumber = #{studentNumber}")
-        UserEntity selectByStudentNumber(@Param("studentNumber") String studentNumber);
-
-        @Delete("DELETE FROM users WHERE id = #{id}")
-        void deleteUserById(@Param("id") Long id);
+    @Update("UPDATE users " +
+            "SET username = #{username}, " +
+            "    password_hash = #{passwordHash}, " +
+            "    enabled = #{enabled}, " +
+            "    studentNumber = #{studentNumber}, " +
+            "    email = #{email}, " +
+            "    updated_at = CURRENT_TIMESTAMP " +
+            "WHERE id = #{id}")
+    void updateUser(UserEntity user);
 }

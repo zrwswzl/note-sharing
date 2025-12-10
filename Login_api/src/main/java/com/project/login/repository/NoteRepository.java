@@ -22,9 +22,4 @@ public interface NoteRepository extends ElasticsearchRepository<NoteEntity, Long
     // 模糊搜索标题（like %title%）
     List<NoteEntity> findByTitleContaining(String title);
 
-    // 根据作者查找笔记
-    List<NoteEntity> findByAuthorName(String authorName);
-
-    // 根据标签搜索（匹配任意一个标签）
-    List<NoteEntity> findByTagsIn(Collection<List<String>> tags);
 }

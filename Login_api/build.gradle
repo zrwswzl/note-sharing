@@ -27,6 +27,7 @@ configurations {
 
 ext {
     elasticVersion = "8.18.1"
+    flinkVersion = "1.19.3"
 }
 
 dependencyManagement {
@@ -74,7 +75,6 @@ dependencies {
     // ------------------- JSON / HTML -------------------
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.20.0'
     implementation 'org.jsoup:jsoup:1.21.2'
-    
 
     // ------------------- DTO Converter -------------------
     implementation 'org.mapstruct:mapstruct:1.6.3'
@@ -113,6 +113,13 @@ dependencies {
     implementation 'com.github.pagehelper:pagehelper-spring-boot-starter:2.0.0'
 
     implementation 'org.apache.pdfbox:pdfbox:2.0.30'
+
+    // ---- Flink 基础 ----
+    implementation "org.apache.flink:flink-java:${flinkVersion}"
+    implementation "org.apache.flink:flink-streaming-java:${flinkVersion}"
+    implementation "org.apache.flink:flink-clients:${flinkVersion}"
+
+    implementation "org.apache.bahir:flink-connector-redis_2.12:1.1.0"
 
 }
 

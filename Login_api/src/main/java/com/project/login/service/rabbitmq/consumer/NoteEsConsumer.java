@@ -11,8 +11,6 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
-import java.util.ArrayList;
-import java.util.List;
 
 @Component
 @RabbitListener(queues = "note.es.queue")
@@ -21,27 +19,13 @@ public class NoteEsConsumer {
     @Resource
     private NoteRepository esRepository;
 
-    private final List<NoteEntity> batch = new ArrayList<>();
-    private final int batchSize = 500;
-    private volatile long lastFlush = System.currentTimeMillis();
-    private final long flushIntervalMs = 2000;
-
     @RabbitHandler
     public void process(EsNoteEvent event) {
 
         switch (event.getAction()) {
             case NoteActionType.CREATE:
             case NoteActionType.UPDATE:
-                NoteEntity entity = buildNoteEntity(event);
-                synchronized (batch) {
-                    batch.add(entity);
-                    long now = System.currentTimeMillis();
-                    if (batch.size() >= batchSize || (now - lastFlush) >= flushIntervalMs) {
-                        esRepository.saveAll(new ArrayList<>(batch));
-                        batch.clear();
-                        lastFlush = now;
-                    }
-                }
+                esRepository.save(buildNoteEntity(event));
                 break;
 
             case NoteActionType.DELETE:
@@ -65,20 +49,7 @@ public class NoteEsConsumer {
         if (event.getTitle() != null) entity.setTitle(event.getTitle());
         if (event.getContentSummary() != null) entity.setContentSummary(event.getContentSummary());
 
-        // 作者信息
-        if (event.getAuthorName() != null) entity.setAuthorName(event.getAuthorName());
-
-        // 统计信息
-        if (event.getViewCount() != null) entity.setViewCount(event.getViewCount());
-        if (event.getLikeCount() != null) entity.setLikeCount(event.getLikeCount());
-        if (event.getFavoriteCount() != null) entity.setFavoriteCount(event.getFavoriteCount());
-        if (event.getCommentCount() != null) entity.setCommentCount(event.getCommentCount());
-
-        // 更新时间
-        if (event.getUpdatedAt() != null) {
-            entity.setUpdatedAt(event.getUpdatedAt());
-        }
-
+        event.setUpdatedAt(LocalDateTime.now());
         return entity;
     }
 
