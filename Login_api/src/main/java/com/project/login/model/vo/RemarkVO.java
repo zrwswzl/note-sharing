@@ -24,7 +24,7 @@ public class RemarkVO {
     private String content;
 
     /** 评论时间 */
-    private LocalDateTime createdAt;
+    private String createdAt;
 
     /** 父评论 ID（顶级评论为 null） */
     private String parentId;

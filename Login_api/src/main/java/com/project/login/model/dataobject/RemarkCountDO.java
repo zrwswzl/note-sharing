@@ -1,6 +1,6 @@
 package com.project.login.model.dataobject;
 
-import jakarta.persistence.Id;
+import org.springframework.data.annotation.Id;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,13 +15,9 @@ import org.springframework.data.mongodb.core.mapping.Field;
 @Document(collection="remark_count")
 public class RemarkCountDO {
     @Id
-    @Field("remark_id")
     private String remarkId;
 
     @Field("remark_like_count")
     private Long remarkLikeCount;
-
-    @Field("version")
-    private Long version;
 
 }

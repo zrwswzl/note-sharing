@@ -48,4 +48,14 @@ public class RabbitConfig {
     public Queue noteMongoQueue() {
         return new Queue("note.mongo.queue", true);
     }
+
+    @Bean
+    public Queue remarkLikeUsersQueue() {
+        return new Queue("remarkLikeUsers.redis.queue", true); // true 表示持久化
+    }
+
+    @Bean
+    public Queue remarkLikeCountQueue() {
+        return new Queue("remarkLikeCount.redis.queue", true);
+    }
 }

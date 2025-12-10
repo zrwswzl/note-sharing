@@ -26,7 +26,6 @@ public interface RemarkConvert {
 
     @Mapping(target = "_id", ignore = true) // _id 是由 MongoDB 自动生成的
     @Mapping(target = "createdAt", ignore = true) // 默认设置创建时间为当前时间
-    @Mapping(target = "likes", constant = "0L") // 设置默认点赞数为 0
     RemarkDO toDO(RemarkInsertDTO dto);
 
     @Mappings({
@@ -37,6 +36,7 @@ public interface RemarkConvert {
             @Mapping(source = "parentId", target = "parentId"), // 映射 parentId
             @Mapping(source = "isReceive", target = "isReceive"), // 映射 isReceive
             @Mapping(target = "username",ignore = true),
+            @Mapping(target = "likeCount",ignore=true),
             @Mapping(source = "replyToUsername",target ="replyToUsername"), // 使用 getReplyToUsername 方法填充 replyToUsername
             @Mapping(target = "replies", ignore = true), // 暂时不处理子评论
             @Mapping(target = "LikedOrNot", ignore = true) // 当前用户是否已点赞，可能需要额外计算或通过其它查询填充

@@ -5,6 +5,6 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface RemarkCountRepository extends MongoRepository<RemarkCountDO,String> {
+public interface RemarkLikeCountRepository extends MongoRepository<RemarkCountDO,String> {
 
 }

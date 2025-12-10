@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -18,9 +19,8 @@ import java.util.Set;
 @Document(collection="remark_likes")
 public class RemarkLikeByUsersDO {
     @Id
-    @Field("remark_id")
     private String remarkId;
 
     @Field("user_list")
-    private Set<String> userList;
+    private Set<Long> userList;
 }
