@@ -34,6 +34,13 @@
               <path d="M8 8a3 3 0 100-6 3 3 0 000 6zm2-3a2 2 0 11-4 0 2 2 0 014 0zm4 8c0 1-1 1-1 1H3s-1 0-1-1 1-4 6-4 6 3 6 4zm-1-.004c-.001-.246-.154-.986-.832-1.664C11.516 10.68 10.289 10 8 10c-2.29 0-3.516.68-4.168 1.332-.678.678-.83 1.418-.832 1.664h10z"/>
             </svg>
             <span class="author-name">{{ stats.authorName || '未知作者' }}</span>
+            <span v-if="noteDetail.createdAt" class="create-time">
+              <svg class="time-icon" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 3.5a.5.5 0 00-1 0V9a.5.5 0 00.252.434l3.5 2a.5.5 0 00.496-.868L8 8.71V3.5z"/>
+                <path d="M8 16A8 8 0 108 0a8 8 0 000 16zm7-8A7 7 0 111 8a7 7 0 0114 0z"/>
+              </svg>
+              {{ formatTime(noteDetail.createdAt) }}
+            </span>
           </div>
           <div class="stats-info">
             <span class="stat-item">
@@ -148,6 +155,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getFileUrlByNoteId, getNoteStats, changeNoteStat } from '@/api/note'
 import { useUserStore } from '@/stores/user'
+import { formatTime } from '@/utils/time'
 import VuePdfEmbed from 'vue-pdf-embed'
 import MarkdownIt from 'markdown-it'
 
@@ -350,7 +358,8 @@ const fetchNoteDetail = async () => {
       noteDetail.value = {
         title: noteInfo.title || props.initialTitle || route.query.title || '无标题笔记',
         fileType: null, // 设置为null，模板中会显示不支持的文件类型提示
-        noteId: noteId
+        noteId: noteId,
+        createdAt: noteInfo.createdAt || null
       }
       restoreActionState()
       loading.value = false
@@ -363,7 +372,8 @@ const fetchNoteDetail = async () => {
     noteDetail.value = {
       title: noteInfo.title || props.initialTitle || route.query.title || '无标题笔记',
       fileType: fileType,
-      noteId: noteId
+      noteId: noteId,
+      createdAt: noteInfo.createdAt || null
     }
     restoreActionState()
 
@@ -570,6 +580,21 @@ onMounted(() => {
   font-size: 15px;
   color: var(--text-secondary);
   font-weight: 500;
+}
+
+.create-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-left: 16px;
+}
+
+.time-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .stats-info {
