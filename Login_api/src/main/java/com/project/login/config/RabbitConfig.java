@@ -68,4 +68,10 @@ public class RabbitConfig {
     public Queue remarkLikeCountQueue() {
         return new Queue("remarkLikeCount.redis.queue", true);
     }
+
+    @Bean
+    public Queue qaRecordQueue() {
+        return new Queue("qa_record.queue", true);
+    }
+
 }

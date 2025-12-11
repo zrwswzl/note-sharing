@@ -24,7 +24,6 @@ import java.util.List;
 public class QAController {
 
     private final QuestionService qaService;
-    private final UserQARecordService userQARecordService;
 
     @GetMapping("/question/record/{authorId}")
     @Operation(summary = "Get question details by questions recorded")
@@ -35,7 +34,7 @@ public class QAController {
 
     @GetMapping("/answer/record/{authorId}")
     @Operation(summary = "Get question details by answers recorded")
-    public StandardResponse<List<QuestionVO>> getAnswersRecoedByAuthorId(@PathVariable Long authorId) throws Exception {
+    public StandardResponse<List<QuestionVO>> getAnswersRecordByAuthorId(@PathVariable Long authorId) throws Exception {
         List<QuestionVO> vo = qaService.getAnswerRecordsByAuthorId(authorId);
         return StandardResponse.success(vo);
     }
