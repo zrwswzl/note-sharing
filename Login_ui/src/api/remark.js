@@ -27,8 +27,8 @@ export const getRemarksByNote = (noteId, loginUserId) => {
  * @param {string} remarkData.replyToUsername - 回复的目标用户名（可选）
  * @param {string} remarkData.content - 评论内容
  * @param {string} remarkData.parentId - 父评论ID（楼中楼，可选）
- * @param {boolean} remarkData.isReceive - 是否是回复（可选）
- * @param {string} remarkData.receiveToRemarkId - 回复哪条评论的ID（可选）
+ * @param {boolean} remarkData.isReply - 是否是回复（可选）
+ * @param {string} remarkData.replyToRemarkId - 回复哪条评论的ID（可选）
  * @returns {Promise<boolean>} 返回操作结果
  */
 export const insertRemark = (remarkData) => {

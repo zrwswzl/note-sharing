@@ -153,6 +153,7 @@
               <div class="comment-main">
                 <div class="comment-header">
                   <div class="comment-author-info">
+                    <div class="comment-level-badge primary">主评论</div>
                     <img 
                       :src="'/assets/avatars/avatar.png'" 
                       :alt="comment.username"
@@ -229,96 +230,154 @@
               <!-- 子评论（回复） -->
               <div v-if="comment.replies && comment.replies.length > 0" class="comment-replies">
                 <div
-                  v-for="reply in comment.replies"
-                  :key="reply._id"
-                  class="comment-item reply-item"
+                  v-for="replyGroup in organizeReplies(comment.replies, comment._id)"
+                  :key="replyGroup.mainReply._id"
+                  class="reply-wrapper"
                 >
-                  <div class="comment-main">
-                    <div class="comment-header">
-                      <div class="comment-author-info">
-                        <img 
-                          :src="'/assets/avatars/avatar.png'" 
-                          :alt="reply.username"
-                          class="comment-avatar"
-                        />
-                        <span class="comment-author">{{ reply.username || '匿名用户' }}</span>
+                  <!-- 二级评论 -->
+                  <div class="comment-item reply-item">
+                    <div class="comment-main">
+                      <div class="comment-header">
+                        <div class="comment-author-info">
+                          <div class="comment-level-badge reply">回复</div>
+                          <img 
+                            :src="'/assets/avatars/avatar.png'" 
+                            :alt="replyGroup.mainReply.username"
+                            class="comment-avatar"
+                          />
+                          <span class="comment-author">{{ replyGroup.mainReply.username || '匿名用户' }}</span>
+                        </div>
+                        <div class="comment-header-right">
+                          <span class="comment-time">{{ formatTime(replyGroup.mainReply.createdAt) }}</span>
+                        </div>
                       </div>
-                      <div class="comment-header-right">
-                        <span class="comment-time">{{ formatTime(reply.createdAt) }}</span>
+                      <div class="comment-content-wrapper">
+                        <p class="comment-content">
+                          <template v-if="replyGroup.mainReply.replyToUsername">
+                            <span v-if="replyGroup.mainReply.replyToUsername !== comment.username && findReplyTarget(replyGroup.mainReply, comment.replies, comment)" class="reply-to">
+                              回复 @{{ findReplyTarget(replyGroup.mainReply, comment.replies, comment) }}：回复 @{{ replyGroup.mainReply.replyToUsername }}：
+                            </span>
+                            <span v-else class="reply-to">
+                              回复 @{{ replyGroup.mainReply.replyToUsername }}：
+                            </span>
+                          </template>
+                          <span>{{ replyGroup.mainReply.content }}</span>
+                        </p>
+                      </div>
+                      <div class="comment-actions">
+                        <button
+                          class="comment-action-btn"
+                          :class="{ active: replyGroup.mainReply.LikedOrNot }"
+                          :disabled="commentActionLoading[replyGroup.mainReply._id]"
+                          @click="handleToggleLike(replyGroup.mainReply)"
+                        >
+                          <svg class="action-icon-small" viewBox="0 0 16 16" fill="currentColor">
+                            <path d="m8 2.748-.717-.737C5.6.281 2.514.878 1.4 3.053c-.523 1.023-.641 2.5.314 4.385C2.972 9.59 5.614 12.368 8 14.25c2.386-1.882 5.028-4.659 6.286-6.813.955-1.886.838-3.362.314-4.385C13.486.878 10.4.28 8.717 2.01z"/>
+                          </svg>
+                          <span>{{ replyGroup.mainReply.likeCount || 0 }}</span>
+                        </button>
+                        <button
+                          v-if="userStore.isLoggedIn"
+                          class="comment-action-btn"
+                          @click="handleReplyToReply(comment, replyGroup.mainReply)"
+                        >
+                          回复
+                        </button>
+                        <button
+                          v-if="userStore.isLoggedIn"
+                          class="comment-action-btn danger"
+                          :disabled="commentActionLoading[replyGroup.mainReply._id]"
+                          @click="handleDeleteComment(replyGroup.mainReply)"
+                        >
+                          删除
+                        </button>
                       </div>
                     </div>
-                    <div class="comment-content-wrapper">
-                      <p class="comment-content">
-                        <!-- 多级回复显示：如果回复的是另一个回复，需要显示完整的回复链 -->
-                        <template v-if="reply.replyToUsername">
-                          <!-- 检查被回复的回复是否也回复了别人 -->
-                          <!-- 如果reply.replyToUsername不等于主评论的username，说明回复的是另一个回复 -->
-                          <!-- 需要在replies中找到被回复的那个回复，看它回复的是谁 -->
-                          <span v-if="reply.replyToUsername !== comment.username && findReplyTarget(reply, comment.replies, comment)" class="reply-to">
-                            回复 @{{ findReplyTarget(reply, comment.replies, comment) }}：回复 @{{ reply.replyToUsername }}：
-                          </span>
-                          <span v-else class="reply-to">
-                            回复 @{{ reply.replyToUsername }}：
-                          </span>
-                        </template>
-                        <span>{{ reply.content }}</span>
-                      </p>
-                    </div>
-                    <div class="comment-actions">
-                      <button
-                        class="comment-action-btn"
-                        :class="{ active: reply.LikedOrNot }"
-                        :disabled="commentActionLoading[reply._id]"
-                        @click="handleToggleLike(reply)"
-                      >
-                        <svg class="action-icon-small" viewBox="0 0 16 16" fill="currentColor">
-                          <path d="m8 2.748-.717-.737C5.6.281 2.514.878 1.4 3.053c-.523 1.023-.641 2.5.314 4.385C2.972 9.59 5.614 12.368 8 14.25c2.386-1.882 5.028-4.659 6.286-6.813.955-1.886.838-3.362.314-4.385C13.486.878 10.4.28 8.717 2.01z"/>
-                        </svg>
-                        <span>{{ reply.likeCount || 0 }}</span>
-                      </button>
-                      <button
-                        v-if="userStore.isLoggedIn"
-                        class="comment-action-btn"
-                        @click="handleReplyToReply(comment, reply)"
-                      >
-                        回复
-                      </button>
-                      <button
-                        v-if="userStore.isLoggedIn"
-                        class="comment-action-btn danger"
-                        :disabled="commentActionLoading[reply._id]"
-                        @click="handleDeleteComment(reply)"
-                      >
-                        删除
-                      </button>
+
+                    <!-- 回复回复的表单 -->
+                    <div v-if="replyingTo === replyGroup.mainReply._id" class="reply-form">
+                      <textarea
+                        v-model="replyContent"
+                        class="comment-input reply-input"
+                        :placeholder="`回复 @${replyGroup.mainReply.username}:`"
+                        rows="3"
+                        :disabled="commentSubmitting"
+                      ></textarea>
+                      <div class="reply-form-actions">
+                        <button
+                          class="comment-submit-btn small"
+                          :disabled="!replyContent.trim() || commentSubmitting"
+                          @click="handleSubmitReply(comment, replyGroup.mainReply)"
+                        >
+                          {{ commentSubmitting ? '提交中...' : '回复' }}
+                        </button>
+                        <button
+                          class="comment-cancel-btn"
+                          @click="cancelReply"
+                        >
+                          取消
+                        </button>
+                      </div>
                     </div>
                   </div>
 
-                  <!-- 回复回复的表单 -->
-                  <div v-if="replyingTo === reply._id" class="reply-form">
-                    <textarea
-                      v-model="replyContent"
-                      class="comment-input reply-input"
-                      :placeholder="`回复 @${reply.username}:`"
-                      rows="3"
-                      :disabled="commentSubmitting"
-                    ></textarea>
-                    <div class="reply-form-actions">
-                      <button
-                        class="comment-submit-btn small"
-                        :disabled="!replyContent.trim() || commentSubmitting"
-                        @click="handleSubmitReply(comment, reply)"
-                      >
-                        {{ commentSubmitting ? '提交中...' : '回复' }}
-                      </button>
-                      <button
-                        class="comment-cancel-btn"
-                        @click="cancelReply"
-                      >
-                        取消
-                      </button>
+                  <!-- 回复二级评论的评论（三级评论） -->
+                  <div v-if="replyGroup.nestedReplies && replyGroup.nestedReplies.length > 0" class="nested-replies">
+                    <div
+                      v-for="nestedReply in replyGroup.nestedReplies"
+                      :key="nestedReply._id"
+                      class="nested-reply-item"
+                    >
+                      <div class="comment-main">
+                        <div class="comment-header">
+                          <div class="comment-author-info">
+                            <div class="comment-level-badge nested">再回复</div>
+                            <img 
+                              :src="'/assets/avatars/avatar.png'" 
+                              :alt="nestedReply.username"
+                              class="comment-avatar"
+                            />
+                            <span class="comment-author">{{ nestedReply.username || '匿名用户' }}</span>
+                          </div>
+                          <div class="comment-header-right">
+                            <span class="comment-time">{{ formatTime(nestedReply.createdAt) }}</span>
+                          </div>
+                        </div>
+                        <div class="comment-content-wrapper">
+                          <p class="comment-content">
+                            <template v-if="nestedReply.replyToUsername">
+                              <span class="reply-to">
+                                回复 @{{ nestedReply.replyToUsername }}：
+                              </span>
+                            </template>
+                            <span>{{ nestedReply.content }}</span>
+                          </p>
+                        </div>
+                        <div class="comment-actions">
+                          <button
+                            class="comment-action-btn"
+                            :class="{ active: nestedReply.LikedOrNot }"
+                            :disabled="commentActionLoading[nestedReply._id]"
+                            @click="handleToggleLike(nestedReply)"
+                          >
+                            <svg class="action-icon-small" viewBox="0 0 16 16" fill="currentColor">
+                              <path d="m8 2.748-.717-.737C5.6.281 2.514.878 1.4 3.053c-.523 1.023-.641 2.5.314 4.385C2.972 9.59 5.614 12.368 8 14.25c2.386-1.882 5.028-4.659 6.286-6.813.955-1.886.838-3.362.314-4.385C13.486.878 10.4.28 8.717 2.01z"/>
+                            </svg>
+                            <span>{{ nestedReply.likeCount || 0 }}</span>
+                          </button>
+                          <button
+                            v-if="userStore.isLoggedIn"
+                            class="comment-action-btn danger"
+                            :disabled="commentActionLoading[nestedReply._id]"
+                            @click="handleDeleteComment(nestedReply)"
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
+
                 </div>
               </div>
             </div>
@@ -749,8 +808,8 @@ const handleSubmitComment = async () => {
       username: username,
       content: newCommentContent.value.trim(),
       parentId: null,
-      isReceive: false,
-      receiveToRemarkId: null,
+      isReply: false,
+      replyToRemarkId: null,
       replyToUsername: null
     }
     
@@ -804,16 +863,24 @@ const handleSubmitReply = async (parentComment, targetReply = null) => {
 
   commentSubmitting.value = true
   try {
+    // 如果回复的是二级评论，使用二级评论的信息
+    const replyTarget = targetReply || parentComment
+    const finalReplyToUsername = replyToUsername.value || replyTarget.username
+    const finalReplyToRemarkId = replyToRemarkId.value || replyTarget._id
+    const finalParentId = replyToParentId.value || parentComment._id
+    
     const remarkData = {
       noteId: noteDetail.value.noteId,
       userId: userId,
       username: username,
       content: replyContent.value.trim(),
-      parentId: replyToParentId.value || parentComment._id,
-      isReceive: true,
-      receiveToRemarkId: replyToRemarkId.value || parentComment._id,
-      replyToUsername: replyToUsername.value || parentComment.username
+      parentId: finalParentId,
+      isReply: true,
+      replyToRemarkId: finalReplyToRemarkId,
+      replyToUsername: finalReplyToUsername
     }
+    
+    console.log('提交回复数据:', remarkData)
     
     await insertRemark(remarkData)
     cancelReply()
@@ -840,6 +907,23 @@ const cancelReply = () => {
   replyToRemarkId.value = null
   replyToUsername.value = null
   replyContent.value = ''
+}
+
+// 组织回复，将回复二级评论的评论和二级评论分组
+const organizeReplies = (replies, parentCommentId) => {
+  if (!replies || replies.length === 0) return []
+  
+  // 找出所有二级评论（parentId指向主评论）
+  const secondLevelReplies = replies.filter(reply => reply.parentId === parentCommentId)
+  
+  // 为每个二级评论找出它的回复（parentId指向该二级评论）
+  return secondLevelReplies.map(mainReply => {
+    const nestedReplies = replies.filter(reply => reply.parentId === mainReply._id)
+    return {
+      mainReply,
+      nestedReplies
+    }
+  })
 }
 
 // 查找被回复的回复回复的是谁（用于多级回复显示）
@@ -1371,17 +1455,56 @@ onMounted(() => {
 }
 
 .comment-item {
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--line-soft);
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--surface-base);
+  border: 2px solid var(--line-soft);
+  transition: all 0.2s;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* 只在主评论（非回复项）上显示顶部绿线 */
+.comment-item:not(.reply-item)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand-primary), rgba(0, 127, 255, 0.3));
+  border-radius: 10px 10px 0 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 1;
+}
+
+.comment-item:hover {
+  border-color: var(--brand-primary);
+  box-shadow: 0 4px 12px rgba(0, 127, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.comment-item:not(.reply-item):hover::before {
+  opacity: 1;
 }
 
 .comment-item:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .comment-main {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  position: relative;
+}
+
+.comment-item .comment-main {
+  padding: 4px 0;
+}
+
+.reply-item .comment-main {
   gap: 8px;
 }
 
@@ -1399,6 +1522,28 @@ onMounted(() => {
   gap: 10px;
 }
 
+.comment-level-badge {
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.comment-level-badge.primary {
+  background: linear-gradient(135deg, var(--brand-primary), #0056b3);
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 127, 255, 0.3);
+}
+
+.comment-level-badge.reply {
+  background: linear-gradient(135deg, rgba(0, 127, 255, 0.15), rgba(0, 127, 255, 0.25));
+  color: var(--brand-primary);
+  border: 1px solid rgba(0, 127, 255, 0.3);
+}
+
 .comment-avatar {
   width: 36px;
   height: 36px;
@@ -1410,7 +1555,7 @@ onMounted(() => {
   transition: border-color 0.2s, transform 0.2s;
 }
 
-.comment-avatar:hover {
+.comment-item:hover .comment-avatar {
   border-color: var(--brand-primary);
   transform: scale(1.05);
 }
@@ -1448,16 +1593,26 @@ onMounted(() => {
   font-size: 15px;
   color: var(--brand-primary);
   font-weight: 600;
-  margin-right: 2px;
+  margin-right: 4px;
+  padding: 2px 6px;
+  background: rgba(0, 127, 255, 0.1);
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.reply-item .reply-to {
+  font-size: 13px;
+  padding: 1px 4px;
 }
 
 .comment-content {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.6;
   color: var(--text-secondary);
   word-wrap: break-word;
   display: inline;
+  padding: 6px 0;
 }
 
 .comment-content span {
@@ -1514,12 +1669,34 @@ onMounted(() => {
 
 /* 回复表单 */
 .reply-form {
-  margin-top: 12px;
-  margin-left: 24px;
+  margin-top: 16px;
+  margin-left: 0;
   padding: 16px;
   background: var(--surface-muted);
   border-radius: 6px;
+  border: 1px solid rgba(0, 127, 255, 0.2);
   border-left: 3px solid var(--brand-primary);
+  position: relative;
+  z-index: 10;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reply-item .reply-form {
+  margin-left: 0;
+  background: rgba(0, 127, 255, 0.05);
+  border-left: 3px solid var(--brand-primary);
+  box-shadow: 0 2px 8px rgba(0, 127, 255, 0.1);
 }
 
 .reply-input {
@@ -1532,23 +1709,147 @@ onMounted(() => {
   gap: 8px;
 }
 
-/* 子评论 */
+/* 子评论容器 */
 .comment-replies {
   margin-top: 16px;
   margin-left: 24px;
-  padding-left: 20px;
-  border-left: 2px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
+/* 二级评论包装器 - 包含二级评论和它的回复 */
+.reply-wrapper {
+  background: var(--surface-muted);
+  border: 1px solid rgba(0, 127, 255, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.reply-wrapper:hover {
+  border-color: var(--brand-primary);
+  box-shadow: 0 2px 8px rgba(0, 127, 255, 0.1);
+}
+
+/* 二级评论 */
 .reply-item {
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--line-soft);
+  padding: 0;
+  margin-bottom: 0;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  border-left: 3px solid var(--brand-primary);
+  padding-left: 12px;
+  position: relative;
+  transition: all 0.2s;
+  overflow: visible;
 }
 
-.reply-item:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+.reply-item:hover {
+  background: transparent;
+  border-color: var(--brand-primary);
+  transform: none;
+  box-shadow: none;
 }
+
+.reply-item .comment-avatar {
+  width: 28px;
+  height: 28px;
+  border-width: 1.5px;
+}
+
+.reply-item .comment-author {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.reply-item .comment-content {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.reply-item .comment-time {
+  font-size: 11px;
+}
+
+.reply-item .comment-action-btn {
+  font-size: 12px;
+  padding: 3px 6px;
+}
+
+.reply-item .action-icon-small {
+  width: 12px;
+  height: 12px;
+}
+
+/* 三级评论（回复的回复） */
+.nested-replies {
+  margin-top: 10px;
+  margin-left: 16px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(0, 127, 255, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nested-reply-item {
+  padding: 8px 10px;
+  background: rgba(0, 127, 255, 0.03);
+  border-radius: 6px;
+  border-left: 2px solid rgba(0, 127, 255, 0.4);
+  position: relative;
+}
+
+.nested-reply-item::before {
+  content: '↪';
+  position: absolute;
+  left: -14px;
+  top: 10px;
+  color: rgba(0, 127, 255, 0.5);
+  font-size: 14px;
+}
+
+.nested-reply-item .comment-avatar {
+  width: 24px;
+  height: 24px;
+  border-width: 1px;
+}
+
+.nested-reply-item .comment-author {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.nested-reply-item .comment-content {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.nested-reply-item .comment-time {
+  font-size: 10px;
+}
+
+.nested-reply-item .comment-action-btn {
+  font-size: 11px;
+  padding: 2px 5px;
+}
+
+.nested-reply-item .action-icon-small {
+  width: 11px;
+  height: 11px;
+}
+
+.comment-level-badge.nested {
+  background: linear-gradient(135deg, rgba(0, 127, 255, 0.1), rgba(0, 127, 255, 0.2));
+  color: var(--brand-primary);
+  border: 1px solid rgba(0, 127, 255, 0.25);
+  font-size: 10px;
+  padding: 1px 6px;
+}
+
 
 .action-sidebar {
   position: sticky;
@@ -1730,6 +2031,21 @@ onMounted(() => {
   .comment-header-right {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .comment-replies {
+    margin-left: 16px;
+    padding-left: 16px;
+  }
+
+  .reply-item::before {
+    left: -20px;
+    font-size: 16px;
+  }
+
+  .comment-level-badge {
+    font-size: 10px;
+    padding: 1px 6px;
   }
 }
 </style>
