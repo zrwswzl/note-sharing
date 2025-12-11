@@ -114,6 +114,19 @@ const error = ref('')
 const topN = ref(10)
 const VIEW_CACHE_PREFIX = 'note_view_ts'
 
+// 更新列表中指定笔记的评论数量
+const updateCommentCount = (noteId, commentCount) => {
+  const item = recommendList.value.find(item => item.noteId === noteId)
+  if (item) {
+    item.commentCount = commentCount
+  }
+}
+
+// 暴露方法供父组件调用
+defineExpose({
+  updateCommentCount
+})
+
 const getCurrentUserId = () => {
   const storeId = userStore.userInfo?.id
   if (storeId) return storeId

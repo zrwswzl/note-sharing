@@ -147,6 +147,22 @@ const hasSearched = ref(false)
 const searchType = ref('notes') // 'notes' 或 'qa'，默认搜索笔记
 const VIEW_CACHE_PREFIX = 'note_view_ts'
 
+// 更新列表中指定笔记的评论数量
+const updateCommentCount = (noteId, commentCount) => {
+  // 只更新笔记类型的搜索结果
+  if (searchType.value === 'notes') {
+    const item = searchResults.value.find(item => item.noteId === noteId)
+    if (item) {
+      item.commentCount = commentCount
+    }
+  }
+}
+
+// 暴露方法供父组件调用
+defineExpose({
+  updateCommentCount
+})
+
 const getViewCacheKey = (noteId, userId) => {
   if (!noteId || !userId) return null
   return `${VIEW_CACHE_PREFIX}:${noteId}:${userId}`

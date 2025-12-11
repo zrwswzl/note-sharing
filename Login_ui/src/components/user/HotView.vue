@@ -116,6 +116,19 @@ const loading = ref(false)
 const error = ref('')
 const VIEW_CACHE_PREFIX = 'note_view_ts'
 
+// 更新列表中指定笔记的评论数量
+const updateCommentCount = (noteId, commentCount) => {
+  const item = hotList.value.find(item => item.noteId === noteId)
+  if (item) {
+    item.commentCount = commentCount
+  }
+}
+
+// 暴露方法供父组件调用
+defineExpose({
+  updateCommentCount
+})
+
 const getViewCacheKey = (noteId, userId) => {
   if (!noteId || !userId) return null
   return `${VIEW_CACHE_PREFIX}:${noteId}:${userId}`

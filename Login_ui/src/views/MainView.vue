@@ -84,21 +84,29 @@
 
       <section v-else-if="currentTab === 'search'">
         <SearchView 
+          ref="searchViewRef"
           :initialKeyword="searchKeywordFromRoute" 
           @open-note-detail="handleOpenNoteDetail"
         />
       </section>
       <section v-else-if="currentTab === 'recommend'">
-        <RecommendView @open-note-detail="handleOpenNoteDetail" />
+        <RecommendView 
+          ref="recommendViewRef"
+          @open-note-detail="handleOpenNoteDetail" 
+        />
       </section>
       <section v-else-if="currentTab === 'hot'">
-        <HotView @open-note-detail="handleOpenNoteDetail" />
+        <HotView 
+          ref="hotViewRef"
+          @open-note-detail="handleOpenNoteDetail" 
+        />
       </section>
       <section v-else-if="currentTab === 'note-detail' && viewingNoteId">
         <NoteDetailView 
           :noteId="viewingNoteId" 
           :initialStats="noteDetailStats"
           :initialTitle="noteDetailTitle"
+          @stats-updated="handleStatsUpdated"
         />
       </section>
       <section v-else-if="currentTab === 'circle'">
@@ -276,6 +284,9 @@ const viewingNoteId = ref(null); // 当前查看的笔记详情ID（用于note-d
 const noteDetailStats = ref(null); // 笔记详情页的统计信息（从搜索结果传递过来）
 const noteDetailTitle = ref(null); // 笔记详情页的标题（从搜索结果传递过来）
 const qaRef = ref(null); // 问答组件实例
+const searchViewRef = ref(null); // 搜索视图组件实例
+const recommendViewRef = ref(null); // 推荐视图组件实例
+const hotViewRef = ref(null); // 热榜视图组件实例
 
 // 获取标签名称的辅助函数
 const getTagNameString = async (tag) => {
@@ -553,6 +564,27 @@ const handleOpenNoteDetail = (payload) => {
         fileType: payload.fileType || undefined
       }
     })
+  }
+}
+
+// 处理统计信息更新（从 NoteDetailView 发出）
+const handleStatsUpdated = (payload) => {
+  if (!payload || !payload.noteId) return
+  
+  // 更新 noteDetailStats
+  if (noteDetailStats.value && noteDetailStats.value.noteId === payload.noteId) {
+    noteDetailStats.value.comments = payload.comments
+  }
+  
+  // 更新各个列表页面中对应笔记的评论数量
+  if (searchViewRef.value && typeof searchViewRef.value.updateCommentCount === 'function') {
+    searchViewRef.value.updateCommentCount(payload.noteId, payload.comments)
+  }
+  if (recommendViewRef.value && typeof recommendViewRef.value.updateCommentCount === 'function') {
+    recommendViewRef.value.updateCommentCount(payload.noteId, payload.comments)
+  }
+  if (hotViewRef.value && typeof hotViewRef.value.updateCommentCount === 'function') {
+    hotViewRef.value.updateCommentCount(payload.noteId, payload.comments)
   }
 }
 

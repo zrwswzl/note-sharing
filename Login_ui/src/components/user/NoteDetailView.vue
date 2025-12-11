@@ -449,6 +449,8 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['stats-updated'])
+
 const loading = ref(true)
 const contentLoading = ref(false)
 const error = ref(null)
@@ -819,9 +821,14 @@ const handleSubmitComment = async () => {
     // 重新获取评论列表
     await fetchComments()
     
-    // 更新评论数统计
+    // 更新评论数统计（创建评论时增加1）
     if (stats.value) {
       stats.value.comments = (stats.value.comments || 0) + 1
+      // 通知父组件评论数量已更新
+      emit('stats-updated', {
+        noteId: noteDetail.value.noteId,
+        comments: stats.value.comments
+      })
     }
   } catch (err) {
     console.error('发表评论失败:', err)
@@ -888,9 +895,14 @@ const handleSubmitReply = async (parentComment, targetReply = null) => {
     // 重新获取评论列表
     await fetchComments()
     
-    // 更新评论数统计
+    // 更新评论数统计（创建回复时增加1）
     if (stats.value) {
       stats.value.comments = (stats.value.comments || 0) + 1
+      // 通知父组件评论数量已更新
+      emit('stats-updated', {
+        noteId: noteDetail.value.noteId,
+        comments: stats.value.comments
+      })
     }
   } catch (err) {
     console.error('回复评论失败:', err)
@@ -980,6 +992,21 @@ const handleToggleLike = async (comment) => {
   }
 }
 
+// 计算评论及其所有子评论的总数（递归计算）
+const countCommentAndReplies = (comment) => {
+  if (!comment) return 0
+  let count = 1 // 评论本身
+  
+  // 如果有子评论（replies），递归计算
+  if (comment.replies && Array.isArray(comment.replies)) {
+    for (const reply of comment.replies) {
+      count += countCommentAndReplies(reply)
+    }
+  }
+  
+  return count
+}
+
 // 删除评论
 const handleDeleteComment = async (comment) => {
   if (!confirm('确定要删除这条评论吗？')) return
@@ -994,14 +1021,22 @@ const handleDeleteComment = async (comment) => {
 
   commentActionLoading.value[comment._id] = true
   try {
+    // 计算要删除的评论数量（包括该评论及其所有子评论）
+    const deleteCount = countCommentAndReplies(comment)
+    
     await deleteRemark(comment._id)
     
     // 重新获取评论列表
     await fetchComments()
     
-    // 更新评论数统计
+    // 更新评论数统计（减去被删除的评论及其所有子评论的数量）
     if (stats.value) {
-      stats.value.comments = Math.max(0, (stats.value.comments || 0) - 1)
+      stats.value.comments = Math.max(0, (stats.value.comments || 0) - deleteCount)
+      // 通知父组件评论数量已更新
+      emit('stats-updated', {
+        noteId: noteDetail.value.noteId,
+        comments: stats.value.comments
+      })
     }
   } catch (err) {
     console.error('删除评论失败:', err)
