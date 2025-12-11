@@ -139,7 +139,7 @@ public class RemarkService {
         } else {
             // Redis中没有则从MongoDB读取
             log.info("finding firstLayer in mongodb");
-            List<RemarkDO> tmpRemarkDOList = remarkRepository.findRemarksByNoteIdAndIsReceiveFalse(noteId);
+            List<RemarkDO> tmpRemarkDOList = remarkRepository.findRemarksByNoteIdAndIsReplyFalse(noteId);
             log.info("get from mongodb,tmpRemarkDOList= "+tmpRemarkDOList.toString());
             for (RemarkDO cur : tmpRemarkDOList) {
                 if (cur != null && cur.get_id() != null) {
@@ -190,7 +190,7 @@ public class RemarkService {
             } else {
                 // Redis没有则从MongoDB获取
                 log.info("try from mongodb");
-                List<RemarkDO> replyList = remarkRepository.findRemarksByParentIdAndIsReceiveTrue(cur);
+                List<RemarkDO> replyList = remarkRepository.findRemarksByParentIdAndIsReplyTrue(cur);
                 for (RemarkDO reply : replyList) {
                     if (reply != null && reply.get_id() != null) {
                         redisTemplate.opsForList().rightPush(replyKey+curDO.get_id(),reply.get_id());
@@ -278,7 +278,7 @@ public class RemarkService {
                 }
             } else {
                 // Redis没有则从数据库加载二级评论，并写入Redis
-                List<RemarkDO> replyList = remarkRepository.findRemarksByParentIdAndIsReceiveTrue(curDO.get_id());
+                List<RemarkDO> replyList = remarkRepository.findRemarksByParentIdAndIsReplyTrue(curDO.get_id());
                 for (RemarkDO reply : replyList) {
                     if (reply != null && reply.get_id() != null) {
                         redisTemplate.opsForValue().set(remarkIdKey + reply.get_id(), reply);
@@ -325,16 +325,16 @@ public class RemarkService {
             // 1. 转换 DTO 到 DO
             RemarkDO remarkDO = remarkConvert.toDO(remarkInsertDTO);
             remarkDO.setCreatedAt(LocalDateTime.now().toString());
-            if(!remarkDO.getIsReceive()){
+            if(!remarkDO.getIsReply()){
                 remarkDO.setReplyToUsername(null);
-                remarkDO.setReceiveToRemarkId(null);
+                remarkDO.setReplyToRemarkId(null);
                 remarkDO.setParentId(null);
             }
             // 2. 保存到数据库
             remarkRepository.save(remarkDO);
 
             // 3. 删除相关缓存（第一次删除）
-            if (!remarkDO.getIsReceive()) {
+            if (!remarkDO.getIsReply()) {
                 redisTemplate.delete(NoteIdKey + remarkDO.getNoteId());
             } else {
                 redisTemplate.delete(replyToIdKey + remarkDO.getParentId());
@@ -344,7 +344,7 @@ public class RemarkService {
             new Thread(() -> {
                 try {
                     Thread.sleep(50); // 延时 50ms，可根据实际并发调整
-                    if (!remarkDO.getIsReceive()) {
+                    if (!remarkDO.getIsReply()) {
                         redisTemplate.delete(NoteIdKey + remarkDO.getNoteId());
                     } else {
                         redisTemplate.delete(replyToIdKey + remarkDO.getParentId());
@@ -369,7 +369,7 @@ public class RemarkService {
                             "Remark not found for ID: " + remarkDeleteDTO.getId()));
 
             // 2. 如果是接收的评论，先删除其子评论及点赞
-            if (Boolean.FALSE.equals(remarkDO.getIsReceive())) {
+            if (Boolean.FALSE.equals(remarkDO.getIsReply())) {
                 String parentId = remarkDO.get_id();
 
                 // 从 Redis 获取子评论列表
@@ -384,7 +384,7 @@ public class RemarkService {
 
                 // Redis 没有则从数据库加载
                 if (childIds.isEmpty()) {
-                    List<RemarkDO> childRemarks = remarkRepository.findRemarksByParentIdAndIsReceiveTrue(parentId);
+                    List<RemarkDO> childRemarks = remarkRepository.findRemarksByParentIdAndIsReplyTrue(parentId);
                     for (RemarkDO child : childRemarks) {
                         if (child != null && child.get_id() != null) {
                             childIds.add(child.get_id());
@@ -412,7 +412,7 @@ public class RemarkService {
             redisTemplate.delete(userLikeRemarkListKey+remarkDO.get_id());
             // 4. 删除 Redis 缓存（第一次删除）
             redisTemplate.delete(remarkIdKey + remarkDO.get_id());
-            if (!remarkDO.getIsReceive()) {
+            if (!remarkDO.getIsReply()) {
                 redisTemplate.delete(NoteIdKey + remarkDO.getNoteId());
             } else {
                 redisTemplate.delete(replyToIdKey + remarkDO.getParentId());
@@ -423,7 +423,7 @@ public class RemarkService {
                 try {
                     Thread.sleep(50); // 延时 50ms
                     redisTemplate.delete(remarkIdKey + remarkDO.get_id());
-                    if (!remarkDO.getIsReceive()) {
+                    if (!remarkDO.getIsReply()) {
                         redisTemplate.delete(NoteIdKey + remarkDO.getNoteId());
                     } else {
                         redisTemplate.delete(replyToIdKey + remarkDO.getParentId());
@@ -580,7 +580,7 @@ public class RemarkService {
             // Redis 已有计数，直接减 1（但不低于 0）
             Long current = redisTemplate.opsForValue().increment(countKey,-1L);
             redisTemplate.expire(countKey,Duration.ofMinutes(15));
-            if (current == null || current <= 0) {
+            if (current == null || current <0) {
                 redisTemplate.opsForValue().set(countKey, 0L);
                 return false;
             }
