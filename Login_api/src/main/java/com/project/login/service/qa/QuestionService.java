@@ -2,6 +2,7 @@ package com.project.login.service.qa;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.project.login.convert.QuestionConvert;
+import com.project.login.model.dataobject.QAType;
 import com.project.login.model.dataobject.QuestionDO;
 import com.project.login.model.dto.qa.*;
 import com.project.login.model.event.QuestionEvent;
@@ -11,15 +12,21 @@ import com.project.login.model.vo.qa.QuestionVO;
 import com.project.login.model.vo.qa.ReplyVO;
 import com.project.login.repository.QuestionRepository;
 
+import com.project.login.service.history.UserQARecordService;
 import jakarta.annotation.Resource;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -30,6 +37,7 @@ public class QuestionService {
     private final QuestionConvert convert;
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
+    private final UserQARecordService userQARecordService;
     @Resource
     private StringRedisTemplate redis;
 
@@ -73,7 +81,13 @@ public class QuestionService {
         );
         rabbitTemplate.convertAndSend("question.es.queue", event);
 
-        // 3. 返回 VO
+        //3. 创建记录
+        try {
+            userQARecordService.sendQARecord(dto.getAuthorId(),q.getQuestionId(), QAType.QUESTION);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
         return convert.toQuestionVO(q);
     }
 
@@ -93,6 +107,13 @@ public class QuestionService {
         repo.save(q);
 
         updateRedisCacheIfExists(dto.getQuestionId(), q);
+
+        //3. 创建记录
+        try {
+            userQARecordService.sendQARecord(dto.getAuthorId(),dto.getQuestionId(),QAType.ANSWER);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
         return convert.toAnswerVO(a);
     }
@@ -168,7 +189,6 @@ public class QuestionService {
         // 转换为 VO 对象并返回
         return convert.toReplyVO(reply);
     }
-
 
     /** 点赞问题 */
     public void likeQuestion(Long userId, String questionId) {
@@ -288,7 +308,6 @@ public class QuestionService {
         updateRedisCacheIfExists(questionId, q);
     }
 
-
     /** 收藏问题 */
     public void favoriteQuestion(Long userId, String questionId) {
         QuestionDO q = repo.findByQuestionId(questionId);
@@ -303,8 +322,6 @@ public class QuestionService {
 
         updateRedisCacheIfExists(questionId, q);
     }
-
-    // 删除操作
 
     /** 删除提问并异步发送到 Elasticsearch */
     public void deleteQuestion(String questionId) {
@@ -327,11 +344,17 @@ public class QuestionService {
                 QuestionEvent.EventType.DELETE
         );
         rabbitTemplate.convertAndSend("question.es.queue", event);
+
+        //4. 删除记录
+        try {
+            userQARecordService.deleteQARecord(q.getAuthorId(),q.getQuestionId(),QAType.QUESTION);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
-
     /** 删除回答 */
-    public void deleteAnswer(String questionId, Long answerId) {
+    public void deleteAnswer(String questionId, Long answerId) throws Exception {
         QuestionDO q = repo.findByQuestionId(questionId);
         if (q == null) return;
 
@@ -339,6 +362,8 @@ public class QuestionService {
         repo.save(q);
 
         updateRedisCacheIfExists(questionId, q);
+
+        userQARecordService.deleteQARecord(q.getAuthorId(),questionId,QAType.ANSWER);
     }
 
     /** 删除评论 */
@@ -411,6 +436,41 @@ public class QuestionService {
         }
 
         return convert.toQuestionVO(q);
+    }
+
+    // 获取提问记录
+    public List<QuestionVO> getQuestionRecordsByAuthorId(Long authorId) throws Exception {
+        List<String> questionIds = userQARecordService.getQARecordsByUserIdAndType(authorId, QAType.QUESTION);
+        List<QuestionVO> vos = new ArrayList<>();
+        for (String questionId : questionIds) {
+            QuestionVO q = getQuestion(questionId);
+            if (q != null) {
+                vos.add(q);
+            }
+        }
+        return vos;
+    }
+
+    // 获取回答记录
+    public List<QuestionVO> getAnswerRecordsByAuthorId(Long authorId) throws Exception {
+        // 获取用户回答的 questionId 列表，并去重
+        List<String> questionIds = new ArrayList<>(new HashSet<>(userQARecordService.getQARecordsByUserIdAndType(authorId, QAType.ANSWER)));
+
+        // 如果没有回答记录，直接返回空列表
+        if (questionIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // 查询问题详情并组装成 QuestionVO 列表
+        List<QuestionVO> questionVOList = new ArrayList<>();
+        for (String questionId : questionIds) {
+            QuestionVO questionVO = getQuestion(questionId);
+            if (questionVO != null) {
+                questionVOList.add(questionVO);
+            }
+        }
+
+        return questionVOList;
     }
 
 }

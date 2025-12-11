@@ -1,15 +1,20 @@
 package com.project.login.controller;
 
+import com.project.login.model.dataobject.QAType;
 import com.project.login.model.dto.qa.*; // 引入 DTOs
 import com.project.login.model.request.qa.*;
 import com.project.login.model.response.StandardResponse;
 import com.project.login.model.vo.qa.*; // 引入 VO
+import com.project.login.service.history.UserQARecordService;
 import com.project.login.service.qa.QuestionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.aspectj.weaver.patterns.TypePatternQuestions;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 
 @Tag(name = "QA", description = "Manage questions and answers")
@@ -19,6 +24,21 @@ import org.springframework.web.bind.annotation.*;
 public class QAController {
 
     private final QuestionService qaService;
+    private final UserQARecordService userQARecordService;
+
+    @GetMapping("/question/record/{authorId}")
+    @Operation(summary = "Get question details by questions recorded")
+    public StandardResponse<List<QuestionVO>> getQuestionsRecordByAuthorId(@PathVariable Long authorId) throws Exception {
+        List<QuestionVO> vo = qaService.getQuestionRecordsByAuthorId(authorId);
+        return StandardResponse.success(vo);
+    }
+
+    @GetMapping("/answer/record/{authorId}")
+    @Operation(summary = "Get question details by answers recorded")
+    public StandardResponse<List<QuestionVO>> getAnswersRecoedByAuthorId(@PathVariable Long authorId) throws Exception {
+        List<QuestionVO> vo = qaService.getAnswerRecordsByAuthorId(authorId);
+        return StandardResponse.success(vo);
+    }
 
     // Question
     @PostMapping("/question")
@@ -81,7 +101,7 @@ public class QAController {
     public StandardResponse<Void> deleteAnswer(
             @Parameter(description = "Answer deletion data", required = true)
             @RequestBody DeleteAnswerRequest rq
-    ) {
+    ) throws Exception {
         qaService.deleteAnswer(rq.getQuestionId(), rq.getAnswerId());
         return StandardResponse.success(null);
     }
