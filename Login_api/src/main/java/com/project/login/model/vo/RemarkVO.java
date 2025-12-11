@@ -16,6 +16,7 @@ public class RemarkVO {
     /** 评论所属的笔记/动态 */
     private Long noteId;
 
+    private Long userId;
     /** 评论用户 */
     private String username;
 

@@ -5,7 +5,7 @@ import com.project.login.convert.NoteConvert; // 引入 Convert
 import com.project.login.model.dto.note.*; // 引入 DTOs
 import com.project.login.model.request.note.*;
 import com.project.login.model.response.StandardResponse;
-import com.project.login.model.vo.NoteShowVO;
+import com.project.login.model.vo.NoteDO;
 import com.project.login.model.vo.NoteVO; // 引入 VO
 import com.project.login.service.noting.NoteService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -134,8 +134,8 @@ public class NoteController {
 
     @Operation(summary = "Get file access URL by noteId")
     @PostMapping("/files/id_url")
-    public StandardResponse<NoteShowVO> getNoteByNoteId(@Valid @RequestParam("noteId") Long noteId) {
-        NoteShowVO vo = noteService.getNoteByNoteId(noteId);
+    public StandardResponse<NoteDO> getNoteByNoteId(@Valid @RequestParam("noteId") Long noteId) {
+        NoteDO vo = noteService.getNoteByNoteId(noteId);
         return StandardResponse.success(vo);
     }
 

@@ -32,7 +32,8 @@ public interface RemarkConvert {
             @Mapping(source = "createdAt", target = "createdAt"), // 映射 createdAt
             @Mapping(source = "parentId", target = "parentId"), // 映射 parentId
             @Mapping(source = "isReply", target = "isReply"), // 映射 isReceive
-            @Mapping(target = "username",ignore = true),
+            @Mapping(source = "username",target="username"),
+            @Mapping(source = "userId",target= "userId"),
             @Mapping(target = "likeCount",ignore=true),
             @Mapping(source = "replyToUsername",target ="replyToUsername"), // 使用 getReplyToUsername 方法填充 replyToUsername
             @Mapping(target = "replies", ignore = true), // 暂时不处理子评论

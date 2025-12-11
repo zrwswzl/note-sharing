@@ -6,7 +6,7 @@ import com.project.login.model.dataobject.*;
 import com.project.login.model.dto.note.*;
 import com.project.login.model.event.EsNoteEvent;
 import com.project.login.model.event.NoteActionType;
-import com.project.login.model.vo.NoteShowVO;
+import com.project.login.model.vo.NoteDO;
 import com.project.login.model.vo.NoteVO;
 import com.project.login.service.minio.MinioService;
 import lombok.RequiredArgsConstructor;
@@ -59,7 +59,7 @@ public class NoteService {
         String name = minioservice.uploadFile(file);
         String url = minioservice.getFileUrl(name);
 
-        NoteDO note = NoteDO.builder()
+        com.project.login.model.dataobject.NoteDO note = com.project.login.model.dataobject.NoteDO.builder()
                 .title(dto.getMeta().getTitle())
                 .fileType(dto.getMeta().getFileType())
                 .filename(name)
@@ -100,7 +100,7 @@ public class NoteService {
     @Transactional
     public NoteVO updateNote(NoteUpdateDTO dto) {
 
-        NoteDO existing = noteMapper.selectById(dto.getMeta().getId());
+        com.project.login.model.dataobject.NoteDO existing = noteMapper.selectById(dto.getMeta().getId());
         if (existing == null) throw new RuntimeException("笔记不存在");
 
         // 上传文件并获取文件名和URL
@@ -137,7 +137,7 @@ public class NoteService {
     @Transactional
     public void deleteNote(NoteDeleteDTO dto) {
 
-        NoteDO existing = noteMapper.selectById(dto.getNoteId());
+        com.project.login.model.dataobject.NoteDO existing = noteMapper.selectById(dto.getNoteId());
         if (existing == null) throw new RuntimeException("笔记不存在");
 
         minioservice.deleteFile(existing.getFilename());
@@ -158,7 +158,7 @@ public class NoteService {
     @Transactional
     public NoteVO moveNote(NoteMoveDTO dto) {
 
-        NoteDO note = noteMapper.selectById(dto.getNoteId());
+        com.project.login.model.dataobject.NoteDO note = noteMapper.selectById(dto.getNoteId());
         if (note == null) throw new RuntimeException("笔记不存在");
 
         if (notebookMapper.selectById(dto.getTargetNotebookId()) == null) {
@@ -179,7 +179,7 @@ public class NoteService {
         if (notebookMapper.selectById(dto.getNotebookID()) == null) {
             throw new RuntimeException("笔记本不存在");
         }
-        List<NoteDO> doList = noteMapper.selectVOListByNotebookId(dto.getNotebookID());
+        List<com.project.login.model.dataobject.NoteDO> doList = noteMapper.selectVOListByNotebookId(dto.getNotebookID());
         return convert.toVOList(doList);
     }
 
@@ -197,7 +197,7 @@ public class NoteService {
         String name = minioservice.uploadFile(file);
         String url = minioservice.getFileUrl(name);
 
-        NoteDO note = NoteDO.builder()
+        com.project.login.model.dataobject.NoteDO note = com.project.login.model.dataobject.NoteDO.builder()
                 .title(dto.getMeta().getTitle())
                 .fileType(dto.getMeta().getFileType())
                 .filename(name)
@@ -241,11 +241,11 @@ public class NoteService {
     }
 
     @Transactional(readOnly = true)
-    public NoteShowVO getNoteByNoteId(Long noteId) {
-        NoteDO existing = noteMapper.selectById(noteId);
+    public NoteDO getNoteByNoteId(Long noteId) {
+        com.project.login.model.dataobject.NoteDO existing = noteMapper.selectById(noteId);
         if (existing == null) throw new RuntimeException("笔记不存在");
         String url = minioservice.getFileUrl(existing.getFilename());
-        NoteShowVO vo = new NoteShowVO();
+        NoteDO vo = new NoteDO();
         vo.setId(existing.getId());
         vo.setTitle(existing.getTitle());
         vo.setUrl(url);
@@ -269,7 +269,7 @@ public class NoteService {
     @Transactional
     public NoteVO renameNote(NoteRenameDTO dto) {
         // 1. 查找
-        NoteDO note = noteMapper.selectById(dto.getId());
+        com.project.login.model.dataobject.NoteDO note = noteMapper.selectById(dto.getId());
         if (note == null) throw new RuntimeException("笔记不存在");
         // 2. 更新名称
         note.setTitle(dto.getNewName());

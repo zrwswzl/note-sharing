@@ -15,10 +15,16 @@ import com.project.login.model.vo.RemarkVO;
 import com.project.login.repository.RemarkLikeCountRepository;
 import com.project.login.repository.RemarkLikeByUsersRepository;
 import com.project.login.repository.RemarkRepository;
+import com.project.login.service.history.HistoryService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +42,7 @@ public class RemarkService {
     private final RemarkConvert remarkConvert;
     private final NoteMapper noteMapper;
     private final UserMapper userMapper;
+    private final HistoryService historyService;
     private final RemarkLikeCountRepository remarkLikeCountRepository;
     private final RedisTemplate<String, Object> redisTemplate;
     private final String remarkLikeCountKey = "remark_like_count:";
@@ -329,7 +336,7 @@ public class RemarkService {
                 remarkDO.setParentId(null);
             }
             // 2. 保存到数据库
-            remarkRepository.save(remarkDO);
+            RemarkDO savedRemarkDO=remarkRepository.save(remarkDO);
 
             // 3. 删除相关缓存（第一次删除）
             if (!remarkDO.getIsReply()) {
@@ -351,7 +358,7 @@ public class RemarkService {
                     Thread.currentThread().interrupt();
                 }
             }).start();
-
+            historyService.logUserHistoryOfRemark(remarkDO.getUserId(),savedRemarkDO.get_id());
             return true;
         } catch (Exception e) {
             throw new RuntimeException("Failed to insert remark", e);
@@ -579,7 +586,7 @@ public class RemarkService {
             // Redis 已有计数，直接减 1（但不低于 0）
             Long current = redisTemplate.opsForValue().increment(countKey,-1L);
             redisTemplate.expire(countKey,Duration.ofMinutes(15));
-            if (current == null || current <= 0) {
+            if (current == null || current < 0) {
                 redisTemplate.opsForValue().set(countKey, 0L);
                 return false;
             }
@@ -602,6 +609,27 @@ public class RemarkService {
         }
         return true;
     }
+    @Transactional
+    public Page<RemarkVO> getRemarkListByIdList(List<String> remarkIdList, int pageNum, int pageSize, Long loginUserId) {
+
+        // 构造分页参数
+        Pageable pageable = PageRequest.of(pageNum - 1, pageSize);
+
+        // 查询数据库，分页返回 RemarkDO
+        Page<RemarkDO> remarkDOPage = remarkRepository.findBy_idIn(remarkIdList, pageable);
+
+        // 查询用户信息
+        UserDO user = userMapper.selectById(loginUserId);
+
+        // 转换 RemarkDO -> RemarkVO 并收集为 List
+        List<RemarkVO> voList = remarkDOPage.stream()
+                .map(remarkDO -> transferDO2VO(remarkDO, user))
+                .collect(Collectors.toList());
+
+        // 构造 Page<RemarkVO>，保留分页信息
+        return new PageImpl<>(voList, pageable, remarkDOPage.getTotalElements());
+    }
+
 
     public void flushLikeCountToMQ(){
         Set<String> keys = redisTemplate.keys(remarkLikeCountKey + "*");
