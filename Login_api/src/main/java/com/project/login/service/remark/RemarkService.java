@@ -15,6 +15,7 @@ import com.project.login.model.vo.RemarkVO;
 import com.project.login.repository.RemarkLikeCountRepository;
 import com.project.login.repository.RemarkLikeByUsersRepository;
 import com.project.login.repository.RemarkRepository;
+import com.project.login.service.notestats.NoteStatsService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class RemarkService {
     private final RemarkConvert remarkConvert;
     private final NoteMapper noteMapper;
     private final UserMapper userMapper;
+    private final NoteStatsService noteStatsService;
     private final RemarkLikeCountRepository remarkLikeCountRepository;
     private final RedisTemplate<String, Object> redisTemplate;
     private final String remarkLikeCountKey = "remark_like_count:";
@@ -353,7 +355,7 @@ public class RemarkService {
                     Thread.currentThread().interrupt();
                 }
             }).start();
-
+            noteStatsService.changeField(remarkDO.getNoteId(),"comments",1);
             return true;
         } catch (Exception e) {
             throw new RuntimeException("Failed to insert remark", e);
@@ -367,7 +369,7 @@ public class RemarkService {
             RemarkDO remarkDO = remarkRepository.findById(remarkDeleteDTO.getId())
                     .orElseThrow(() -> new RuntimeException(
                             "Remark not found for ID: " + remarkDeleteDTO.getId()));
-
+            Long noteId=remarkDO.getNoteId();
             // 2. 如果是接收的评论，先删除其子评论及点赞
             if (Boolean.FALSE.equals(remarkDO.getIsReply())) {
                 String parentId = remarkDO.get_id();
@@ -399,6 +401,7 @@ public class RemarkService {
                     redisTemplate.delete(remarkLikeCountKey + childId);
                     redisTemplate.delete(userLikeRemarkListKey + childId);
                     redisTemplate.delete(remarkIdKey + childId);
+                    noteStatsService.changeField(noteId,"comments",-1);
                 }
 
                 redisTemplate.delete(replyKey);
@@ -432,7 +435,7 @@ public class RemarkService {
                     Thread.currentThread().interrupt();
                 }
             }).start();
-
+            noteStatsService.changeField(noteId,"comments",-1);
             return Boolean.TRUE;
         } catch (Exception e) {
             System.err.println("Failed to delete remark: " + e.getMessage());
