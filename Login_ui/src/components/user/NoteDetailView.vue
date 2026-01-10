@@ -571,6 +571,14 @@ const handleToggleStat = async (field) => {
     updateStatsFromResponse(updated)
     flagRef.value = delta > 0
     persistActionState(field, flagRef.value)
+    
+    // 通知父组件统计信息已更新
+    emit('stats-updated', {
+      noteId: noteDetail.value.noteId,
+      likes: stats.value.likes,
+      favorites: stats.value.favorites,
+      comments: stats.value.comments
+    })
   } catch (err) {
     console.error('更新笔记统计失败:', err)
   } finally {
@@ -706,23 +714,55 @@ const fetchNoteDetail = async () => {
 
 // 返回上一页
 const goBack = () => {
-  // 根据来源 tab 返回对应页面，默认回到热榜
-  const fromTab = route.query.fromTab || 'hot'
-  if (route.query.tab === 'note-detail') {
-    router.replace({
+  // 根据来源 tab 返回对应页面
+  const fromTab = route.query.fromTab
+  
+  console.log('[NoteDetailView] 返回按钮点击，fromTab:', fromTab, '完整 query:', JSON.stringify(route.query))
+  
+  // 如果没有 fromTab，默认返回热榜
+  if (!fromTab) {
+    console.log('[NoteDetailView] 没有 fromTab，返回热榜')
+    router.push({
       path: route.path,
-      query: {
-        ...route.query,
-        tab: fromTab,
-        fromTab: undefined,
-        noteId: undefined,
-        title: undefined,
-        fileType: undefined
-      }
+      query: { tab: 'hot' }
     })
-  } else {
-    router.back()
+    return
   }
+  
+  // 如果来自搜索结果，返回到搜索结果页面并保留搜索参数
+  if (fromTab === 'search') {
+    const keyword = route.query.keyword
+    const searchType = route.query.searchType || 'notes'
+    
+    console.log('[NoteDetailView] 返回搜索页面，keyword:', keyword, 'searchType:', searchType)
+    
+    // 构建新的查询参数，只保留必要的参数
+    const newQuery = {
+      tab: 'search'
+    }
+    
+    // 保留搜索参数（必须存在才添加）
+    if (keyword) {
+      newQuery.keyword = keyword
+    }
+    if (searchType) {
+      newQuery.searchType = searchType
+    }
+    
+    // 直接更新路由，确保返回到搜索页面
+    router.push({
+      path: route.path,
+      query: newQuery
+    })
+    return
+  }
+  
+  // 其他来源（hot、recommend等），返回到对应的 tab，只保留 tab 参数
+  console.log('[NoteDetailView] 返回到:', fromTab)
+  router.push({
+    path: route.path,
+    query: { tab: fromTab }
+  })
 }
 
 // 监听noteId变化

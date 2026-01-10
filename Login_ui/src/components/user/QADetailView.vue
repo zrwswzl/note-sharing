@@ -357,15 +357,37 @@ const goBack = () => {
     }
   }
   
-  router.replace({
-    path: route.path,
-    query: {
-      ...route.query,
-      tab: 'circle',
-      questionId: undefined,
-      answerId: undefined
-    }
-  })
+  // 检查是否来自搜索结果
+  const fromTab = route.query.fromTab
+  if (fromTab === 'search') {
+    // 如果来自搜索结果，返回到搜索结果页面并保留搜索参数
+    const keyword = route.query.keyword
+    const searchType = route.query.searchType || 'qa'
+    router.replace({
+      path: route.path,
+      query: {
+        ...route.query,
+        tab: 'search',
+        fromTab: undefined,
+        questionId: undefined,
+        answerId: undefined,
+        // 保留搜索参数 keyword 和 searchType
+        keyword: keyword,
+        searchType: searchType
+      }
+    })
+  } else {
+    // 其他来源，返回到问答圈
+    router.replace({
+      path: route.path,
+      query: {
+        ...route.query,
+        tab: 'circle',
+        questionId: undefined,
+        answerId: undefined
+      }
+    })
+  }
 }
 
 // 创建回答
