@@ -1,12 +1,11 @@
 package com.project.login.controller;
 
 import com.project.login.model.response.StandardResponse;
-import com.project.login.model.vo.followRelation.GetFollowersVO;
-import com.project.login.model.vo.followRelation.GetFollowingsVO;
-import com.project.login.service.followRelation.FollowRelationService;
+import com.project.login.model.vo.userFollow.GetFollowersVO;
+import com.project.login.model.vo.userFollow.GetFollowingsVO;
+import com.project.login.service.userFollow.UserFollowService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class FollowRelationController {
 
-    private final FollowRelationService followService;
+    private final UserFollowService followService;
 
     @Operation(summary = "Get the list of users this user is following")
     @GetMapping("/followings")
@@ -49,9 +48,6 @@ public class FollowRelationController {
         else if(code==-2){
             return StandardResponse.success("Already followed",false);
         }
-        else if(code==-3){
-            return StandardResponse.success("user not exist",false);
-        }
         else{
             return StandardResponse.success(true);
         }
@@ -79,5 +75,16 @@ public class FollowRelationController {
         boolean result = followService.isFollowing(userId, targetUserId);
         return StandardResponse.success(result);
     }
+
+    @Operation(summary = "Check if two users follow each other (mutual follow)")
+    @GetMapping("/isMutualFollow")
+    public StandardResponse<Boolean> isMutualFollow(
+            @RequestParam Long userId,
+            @RequestParam Long targetUserId
+    ) {
+        boolean result = followService.isMutualFollow(userId, targetUserId);
+        return StandardResponse.success(result);
+    }
+
 
 }

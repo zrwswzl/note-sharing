@@ -1,6 +1,5 @@
-package com.project.login.model.vo.followRelation;
+package com.project.login.model.vo.userFollow;
 
-import com.project.login.model.dataobject.FollowRelationDO;
 import com.project.login.model.dataobject.FollowUser;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
