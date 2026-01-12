@@ -1,3 +1,4 @@
+
 package com.project.login.service.flink;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,6 +11,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 import redis.clients.jedis.Jedis;
 
@@ -27,7 +29,17 @@ public class BehaviorSearchJob {
 
     public static void main(String[] args) throws Exception {
 
-        StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        //StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+        // -------------------- 本地模式配置 --------------------
+        Configuration conf = new Configuration();
+        conf.setString("taskmanager.memory.network.min", "128mb"); // 保证至少 40 个 buffer
+        conf.setString("taskmanager.memory.network.max", "128mb");
+        conf.setString("taskmanager.memory.segment-size", "32768"); // 32KB
+        int slotNum = 4; // 本地 TaskManager slot 数量，必须大于 1
+        conf.setInteger("taskmanager.numberOfTaskSlots", slotNum);
+
+        StreamExecutionEnvironment env =
+                StreamExecutionEnvironment.createLocalEnvironment(slotNum, conf);
 
         // -------------------- 用户行为流 --------------------
         var behaviorStream = env
