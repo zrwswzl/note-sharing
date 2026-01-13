@@ -488,7 +488,7 @@ public class ModerationService {
                 : "内容不符合平台规范";
             try {
                 notificationService.createNoteModerationRejectedNotification(adminId, noteId, note.getTitle(), reason);
-            } catch (Exception e) {
+        } catch (Exception e) {
                 log.error("发送审查未通过通知失败", e);
                 // 通知发送失败不影响审查结果
             }
