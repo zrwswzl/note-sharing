@@ -20,6 +20,8 @@ import com.project.login.model.request.moderation.ReviewNoteRequest;
 import com.project.login.model.vo.NoteModerationVO;
 import com.project.login.model.vo.NoteReviewVO;
 import com.project.login.model.vo.PendingNoteVO;
+import com.project.login.model.vo.SubmitModerationResponseVO;
+import com.project.login.model.dataobject.NoteModerationDO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -256,7 +258,7 @@ public class AdminController {
 
     @Operation(summary = "提交审查记录（标记笔记为审核中）")
     @PostMapping("/moderation/submit")
-    public StandardResponse<Map<String, String>> submitModeration(
+    public StandardResponse<SubmitModerationResponseVO> submitModeration(
             @RequestBody SubmitModerationRequest request) {
         try {
             // 构造 SensitiveCheckResult 对象
@@ -287,11 +289,18 @@ public class AdminController {
             noteMeta.setNoteId(request.getNoteId());
             result.setNoteMeta(noteMeta);
             
-            // 保存审查记录
-            moderationService.saveResult(result);
+            // 保存审查记录并获取审查记录DO对象（包含ID和创建时间）
+            NoteModerationDO moderationDO = moderationService.saveResultAndReturnDO(result);
             
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "审查记录已提交");
+            // 构建响应对象
+            SubmitModerationResponseVO response = SubmitModerationResponseVO.builder()
+                    .moderationId(moderationDO.getId())
+                    .contentType("NOTE")  // 内容类型固定为NOTE
+                    .contentId(request.getNoteId())
+                    .status(request.getStatus())
+                    .createdAt(moderationDO.getCreatedAt())
+                    .build();
+            
             return StandardResponse.success("审查记录已提交", response);
         } catch (Exception e) {
             log.error("提交审查记录失败", e);

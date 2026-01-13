@@ -45,19 +45,19 @@
             </tr>
             <tr v-else v-for="mod in moderations" :key="mod.id">
               <td>{{ mod.id }}</td>
-              <td>{{ mod.contentType || mod.type || '-' }}</td>
-              <td>{{ mod.contentId || mod.targetId || '-' }}</td>
-              <td class="reason-cell">{{ mod.reason || '-' }}</td>
+              <td>NOTE</td>
+              <td>{{ mod.noteId || '-' }}</td>
+              <td class="reason-cell">{{ getTriggerReason(mod) }}</td>
               <td>
-                <span :class="['status-badge', getStatusClass(mod.status)]">
-                  {{ getStatusText(mod.status) }}
+                <span :class="['status-badge', getStatusClass(mod.status, mod.isHandled)]">
+                  {{ getStatusText(mod.status, mod.isHandled) }}
                 </span>
               </td>
-              <td>{{ formatTime(mod.createdAt || mod.createTime) }}</td>
+              <td>{{ formatTime(mod.createdAt) }}</td>
               <td>
                 <button class="action-btn" @click="viewDetail(mod)">查看详情</button>
                 <button
-                  v-if="mod.status === 'PENDING'"
+                  v-if="!mod.isHandled && mod.status === 'FLAGGED'"
                   class="action-btn handle-btn"
                   @click="handleModeration(mod)"
                 >
@@ -89,23 +89,39 @@
           </div>
           <div class="detail-item">
             <label>内容类型：</label>
-            <span>{{ currentModeration?.contentType || currentModeration?.type }}</span>
+            <span>NOTE</span>
           </div>
           <div class="detail-item">
             <label>内容ID：</label>
-            <span>{{ currentModeration?.contentId || currentModeration?.targetId }}</span>
+            <span>{{ currentModeration?.noteId || '-' }}</span>
           </div>
           <div class="detail-item">
-            <label>触发原因：</label>
-            <span>{{ currentModeration?.reason || '-' }}</span>
+            <label>笔记标题：</label>
+            <span>{{ currentModeration?.noteTitle || '-' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>风险等级：</label>
+            <span>{{ getRiskLevelText(currentModeration?.riskLevel) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>风险评分：</label>
+            <span>{{ currentModeration?.score || '-' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>违规类别：</label>
+            <span>{{ formatCategories(currentModeration?.categories) }}</span>
           </div>
           <div class="detail-item">
             <label>状态：</label>
-            <span :class="['status-badge', getStatusClass(currentModeration?.status)]">
-              {{ getStatusText(currentModeration?.status) }}
+            <span :class="['status-badge', getStatusClass(currentModeration?.status, currentModeration?.isHandled)]">
+              {{ getStatusText(currentModeration?.status, currentModeration?.isHandled) }}
             </span>
           </div>
-          <div v-if="currentModeration?.status === 'PENDING'" class="handle-section">
+          <div class="detail-item">
+            <label>创建时间：</label>
+            <span>{{ formatTime(currentModeration?.createdAt) }}</span>
+          </div>
+          <div v-if="!currentModeration?.isHandled && currentModeration?.status === 'FLAGGED'" class="handle-section">
             <label>管理员备注：</label>
             <textarea
               v-model="adminNote"
@@ -144,6 +160,7 @@ const loadModerations = async () => {
   loading.value = true
   try {
     const res = await getPendingModerations()
+    // StandardResponse结构：{ code, message, data }
     moderations.value = res?.data || res || []
   } catch (error) {
     console.error('加载审查记录失败:', error)
@@ -162,22 +179,54 @@ const formatTime = (timeStr) => {
   }
 }
 
-const getStatusText = (status) => {
+const getStatusText = (status, isHandled) => {
+  if (isHandled) {
+    return '已处理'
+  }
   const statusMap = {
-    PENDING: '待处理',
-    HANDLED: '已处理',
-    REJECTED: '已拒绝'
+    FLAGGED: '待处理',
+    SAFE: '安全',
+    ERROR: '错误'
   }
   return statusMap[status] || status || '-'
 }
 
-const getStatusClass = (status) => {
+const getStatusClass = (status, isHandled) => {
+  if (isHandled) {
+    return 'status-handled'
+  }
   const classMap = {
-    PENDING: 'status-pending',
-    HANDLED: 'status-handled',
-    REJECTED: 'status-rejected'
+    FLAGGED: 'status-pending',
+    SAFE: 'status-safe',
+    ERROR: 'status-error'
   }
   return classMap[status] || ''
+}
+
+const getRiskLevelText = (riskLevel) => {
+  const levelMap = {
+    LOW: '低',
+    MEDIUM: '中',
+    HIGH: '高'
+  }
+  return levelMap[riskLevel] || riskLevel || '-'
+}
+
+const formatCategories = (categories) => {
+  if (!categories || categories.length === 0) {
+    return '-'
+  }
+  return categories.join('、')
+}
+
+const getTriggerReason = (mod) => {
+  if (mod.categories && mod.categories.length > 0) {
+    return mod.categories.join('、')
+  }
+  if (mod.riskLevel) {
+    return `风险等级：${getRiskLevelText(mod.riskLevel)}`
+  }
+  return '-'
 }
 
 const viewDetail = (mod) => {
@@ -369,6 +418,16 @@ onUnmounted(() => {
 }
 
 .status-rejected {
+  background: #fff1f0;
+  color: #ff4d4f;
+}
+
+.status-safe {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.status-error {
   background: #fff1f0;
   color: #ff4d4f;
 }

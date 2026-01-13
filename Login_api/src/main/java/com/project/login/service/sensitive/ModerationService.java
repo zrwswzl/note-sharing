@@ -77,6 +77,41 @@ public class ModerationService {
         }
     }
 
+    /**
+     * 保存审查结果并返回审查记录DO对象（包含ID和创建时间）
+     * @param r 敏感词检查结果
+     * @return 保存后的审查记录DO对象
+     */
+    public NoteModerationDO saveResultAndReturnDO(SensitiveCheckResult r) {
+        Long noteId = r.getNoteMeta() == null ? null : r.getNoteMeta().getNoteId();
+        NoteModerationDO existing = noteId == null ? null : noteModerationMapper.selectLatestPendingByNoteId(noteId);
+
+        NoteModerationDO d = existing == null ? new NoteModerationDO() : existing;
+        if (noteId != null) d.setNoteId(noteId);
+        d.setStatus(r.getStatus());
+        d.setRiskLevel(r.getRiskLevel());
+        d.setScore(r.getScore() == null ? null : r.getScore().intValue());
+        try {
+            d.setCategoriesJson(objectMapper.writeValueAsString(r.getCategories()));
+            d.setFindingsJson(objectMapper.writeValueAsString(r.getFindings()));
+        } catch (Exception e) {
+            d.setCategoriesJson("[]");
+            d.setFindingsJson("[]");
+        }
+        d.setSource("LLM");
+        LocalDateTime now = LocalDateTime.now();
+        d.setCreatedAt(now);
+        d.setIsHandled(Boolean.FALSE);
+
+        if (existing == null) {
+            noteModerationMapper.insert(d);
+        } else {
+            noteModerationMapper.updateFields(d);
+        }
+        
+        return d;
+    }
+
     @Transactional(readOnly = true)
     public List<NoteModerationVO> getPendingFlagged() {
         List<NoteModerationDO> doList = noteModerationMapper.selectPendingFlagged();

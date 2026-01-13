@@ -1715,7 +1715,7 @@ const confirmModeration = async () => {
     if (savedVo) {
       // 提交审查记录到管理员端
       const { submitModeration } = await import('@/api/admin');
-      await submitModeration(savedVo.id, moderationCheckResult.value);
+      const moderationResponse = await submitModeration(savedVo.id, moderationCheckResult.value);
       
       // 更新本地笔记信息
       if (savedVo.updatedAt) {
@@ -1729,7 +1729,14 @@ const confirmModeration = async () => {
       
       showModerationDialog.value = false;
       isLoading.value = false;
-      showSuccess('笔记已提交审核，审核期间无法修改');
+      
+      // 显示提交成功信息，包含审查ID
+      const moderationData = moderationResponse?.data || moderationResponse;
+      if (moderationData?.moderationId) {
+        showSuccess(`笔记已提交审核（审查ID：${moderationData.moderationId}），审核期间无法修改`);
+      } else {
+        showSuccess('笔记已提交审核，审核期间无法修改');
+      }
     }
   } catch (error) {
     console.error('提交审核失败:', error);
