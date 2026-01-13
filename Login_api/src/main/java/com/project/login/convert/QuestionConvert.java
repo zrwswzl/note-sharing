@@ -40,6 +40,9 @@ public class QuestionConvert {
 
         vo.setLikeCount(doObj.getLikes().size());
         vo.setFavoriteCount(doObj.getFavorites().size());
+        
+        // 设置回答数量
+        vo.setAnswerCount(doObj.getAnswers() != null ? doObj.getAnswers().size() : 0);
 
         vo.setAnswers(
                 doObj.getAnswers().stream()
@@ -79,6 +82,14 @@ public class QuestionConvert {
         CommentVO vo = new CommentVO();
         vo.setCommentId(c.getCommentId());
         vo.setAuthorId(c.getAuthorId());
+        // 查询评论者用户名
+        try {
+            String authorName = userMapper.selectNameById(c.getAuthorId());
+            vo.setAuthorName(authorName != null ? authorName : "用户 #" + c.getAuthorId());
+        } catch (Exception e) {
+            log.warn("获取评论者用户名失败 authorId={}", c.getAuthorId(), e);
+            vo.setAuthorName("用户 #" + c.getAuthorId());
+        }
         vo.setContent(c.getContent());
         vo.setCreatedAt(c.getCreatedAt());
         vo.setLikeCount(c.getLikes().size());
@@ -96,6 +107,14 @@ public class QuestionConvert {
         ReplyVO vo = new ReplyVO();
         vo.setReplyId(r.getReplyId());
         vo.setAuthorId(r.getAuthorId());
+        // 查询回复者用户名
+        try {
+            String authorName = userMapper.selectNameById(r.getAuthorId());
+            vo.setAuthorName(authorName != null ? authorName : "用户 #" + r.getAuthorId());
+        } catch (Exception e) {
+            log.warn("获取回复者用户名失败 authorId={}", r.getAuthorId(), e);
+            vo.setAuthorName("用户 #" + r.getAuthorId());
+        }
         vo.setContent(r.getContent());
         vo.setCreatedAt(r.getCreatedAt());
         vo.setLikeCount(r.getLikes().size());

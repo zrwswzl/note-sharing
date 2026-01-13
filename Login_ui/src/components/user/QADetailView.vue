@@ -157,7 +157,7 @@
                 >
                   <div class="comment-header">
                     <div class="comment-meta">
-                      <span class="comment-author">评论者 #{{ comment.authorId }}</span>
+                      <span class="comment-author">{{ comment.authorName || `评论者 #${comment.authorId}` }}</span>
                       <span class="comment-time">{{ formatTime(comment.createdAt) }}</span>
                     </div>
                     <div class="comment-header-actions">
@@ -213,7 +213,7 @@
                     >
                       <div class="reply-header">
                         <div class="reply-meta">
-                          <span class="reply-author">回复者 #{{ reply.authorId }}</span>
+                          <span class="reply-author">{{ reply.authorName || `回复者 #${reply.authorId}` }}</span>
                           <span class="reply-time">{{ formatTime(reply.createdAt) }}</span>
                         </div>
                         <div class="reply-header-actions">

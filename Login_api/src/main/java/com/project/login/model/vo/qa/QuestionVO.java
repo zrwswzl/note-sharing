@@ -18,6 +18,7 @@ public class QuestionVO {
 
     private Integer likeCount;
     private Integer favoriteCount;
+    private Integer answerCount;  // 回答数量
 
     private List<AnswerVO> answers;
 }
