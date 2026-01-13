@@ -111,7 +111,7 @@
                   {{ displayPeerName }}
                 </div>
                 <div class="pm-peer-subtitle">
-                  互相关注 · 支持实时私信
+                  {{ isCurrentMutualFollow ? '互相关注 · 支持实时私信' : '已取消互相关注 · 仅可查看历史消息' }}
                 </div>
               </div>
             </div>
@@ -162,7 +162,7 @@
               <button
                 type="button"
                 class="pm-send-btn"
-                :disabled="sending || !draftMessage.trim()"
+                :disabled="sending || !draftMessage.trim() || !isCurrentMutualFollow"
                 @click="handleSend"
               >
                 {{ sending ? '发送中...' : '发送' }}
@@ -221,6 +221,7 @@ const unreadMap = ref({})
 const totalUnread = ref(0)
 const mutualFollowUsers = ref([])
 const loadingMutualFollow = ref(false)
+const isCurrentMutualFollow = ref(true) // 当前会话是否仍为互相关注
 
 const currentConversationId = ref(null)
 const currentPeerId = ref(null)
@@ -341,6 +342,12 @@ async function loadPeerUserInfo(peerId) {
 const sendTip = computed(() => {
   if (!currentUserId.value) {
     return '请先登录后再发送私信'
+  }
+  if (!currentPeerId.value) {
+    return '选择一个会话开始聊天'
+  }
+  if (!isCurrentMutualFollow.value) {
+    return '双方已不再互相关注，只能查看历史消息，无法继续发送'
   }
   return '私信仅在互相关注的用户之间可用'
 })
@@ -481,6 +488,16 @@ async function handleSelectConversation(item) {
   await loadPeerUserInfo(item.peerId)
   const userInfo = peerUserInfoMap.value[item.peerId]
   currentPeerName.value = userInfo?.username || item.peerName || null
+
+  // 选择会话时检查当前是否仍为互相关注，用于更新 UI 状态
+  try {
+    const mutual = await isMutualFollow(currentUserId.value, currentPeerId.value)
+    isCurrentMutualFollow.value = !!mutual
+  } catch (e) {
+    console.error('检查互相关注状态失败', e)
+    // 检查失败时，不强制修改原状态，避免误伤
+  }
+
   await loadMessagesForConversation(item.conversationId)
   await markAsRead(item.conversationId)
   subscribeConversation(item.conversationId)
@@ -685,8 +702,9 @@ async function handleSend() {
   // 发送前先检查是否互相关注
   try {
     const mutual = await isMutualFollow(currentUserId.value, currentPeerId.value)
-    if (!mutual) {
-      showError('只能向互相关注的用户发送私信，请先互相关注')
+    isCurrentMutualFollow.value = !!mutual
+    if (!isCurrentMutualFollow.value) {
+      showError('双方已不再互相关注，只能查看历史消息，无法继续发送')
       return
     }
   } catch (e) {
