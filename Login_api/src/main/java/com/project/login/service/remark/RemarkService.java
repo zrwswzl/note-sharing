@@ -53,6 +53,7 @@ public class RemarkService {
     private final String LikeCountQueue="remarkLikeCount.redis.queue";
     private final String LikeUsersQueue="remarkLikeUsers.redis.queue";
     private final NotificationService notificationService;
+    private final com.project.login.controller.RemarkWebSocketController remarkWebSocketController;
 
     private RemarkVO transferDO2VO(RemarkDO remarkDO, UserDO user) {
         //初始转化与变量准备
@@ -386,6 +387,21 @@ public class RemarkService {
                 // 回复评论：评论我的评论
                 notificationService.createNoteReplyCommentNotification(remarkDO.getReplyToRemarkId(), actorId);
             }
+
+            // --- 推送 WebSocket 消息 ---
+            // 构建一个简化的 RemarkVO 用于推送（LikedOrNot 设为 false，前端接收后可根据当前用户设置）
+            try {
+                UserDO userDO = userMapper.selectById(actorId);
+                if (userDO != null) {
+                    RemarkVO remarkVO = transferDO2VO(remarkDO, userDO);
+                    // 推送新评论到所有订阅该笔记的用户
+                    remarkWebSocketController.broadcastNewRemark(noteId, remarkVO);
+                }
+            } catch (Exception e) {
+                log.warn("推送评论 WebSocket 消息失败", e);
+                // WebSocket 推送失败不影响评论插入
+            }
+
             return true;
         } catch (Exception e) {
             throw new RuntimeException("Failed to insert remark", e);

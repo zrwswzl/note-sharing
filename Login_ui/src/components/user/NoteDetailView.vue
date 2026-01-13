@@ -218,7 +218,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getFileUrlByNoteId, getNoteStats, changeNoteStat } from '@/api/note'
 import { getRemarksByNote, insertRemark, deleteRemark, likeRemark, cancelLikeRemark } from '@/api/remark'
@@ -231,6 +231,8 @@ import MessageToast from '@/components/MessageToast.vue'
 import FollowButton from '@/components/FollowButton.vue'
 import CommentItem from '@/components/user/CommentItem.vue'
 import { useMessage } from '@/utils/message'
+import { Client as StompClient } from '@stomp/stompjs'
+import SockJS from 'sockjs-client'
 
 const router = useRouter()
 const route = useRoute()
@@ -302,6 +304,10 @@ const commentActionLoading = ref({})
 // 作者相关状态
 const authorUserId = ref(null) // 作者的userId
 const authorUserIdLoading = ref(false) // 是否正在获取作者ID
+
+// WebSocket 相关状态
+let stompClient = null
+let commentSubscription = null
 
 // 配置markdown-it解析器
 const mdParser = new MarkdownIt({
@@ -544,6 +550,8 @@ const fetchNoteDetail = async () => {
       restoreActionState()
       // 即使不支持的文件类型，也要加载评论列表
       await fetchComments(noteId)
+      // 订阅 WebSocket
+      subscribeToComments()
       loading.value = false
       return // 提前返回，不加载文件内容，但保持标题、作者、点赞、收藏等功能正常
     }
@@ -561,6 +569,9 @@ const fetchNoteDetail = async () => {
 
     // 加载评论列表（直接传递noteId，确保使用正确的笔记ID）
     await fetchComments(noteId)
+
+    // 订阅 WebSocket（笔记加载完成后）
+    subscribeToComments()
 
     // 如果是Markdown文件，获取内容并转换为HTML
     if (noteDetail.value.fileType === 'md') {
@@ -662,6 +673,10 @@ watch(() => props.noteId, (newNoteId, oldNoteId) => {
   if (newNoteId && newNoteId !== oldNoteId) {
     console.log('[NoteDetailView] noteId变化，从', oldNoteId, '到', newNoteId)
     fetchNoteDetail()
+    // 重新订阅 WebSocket（noteId 变化后）
+    setTimeout(() => {
+      subscribeToComments()
+    }, 500) // 等待笔记加载完成
   }
 }, { immediate: false })
 
@@ -939,10 +954,155 @@ const handleDeleteComment = async (comment) => {
   }
 }
 
+// WebSocket 连接和订阅
+const connectWebSocket = () => {
+  // 如果已经连接，先断开
+  if (stompClient && stompClient.connected) {
+    disconnectWebSocket()
+  }
+
+  const userId = getCurrentUserId()
+  const userInfo = userStore.userInfo
+  if (!userId || !userInfo?.token) {
+    return
+  }
+
+  const socketUrl = 'http://localhost:8080/ws'
+  const socket = new SockJS(socketUrl)
+
+  stompClient = new StompClient({
+    webSocketFactory: () => socket,
+    reconnectDelay: 5000,
+    debug: () => {},
+    connectHeaders: {
+      Authorization: `Bearer ${userInfo.token}`
+    },
+    onConnect: () => {
+      subscribeToComments()
+    },
+    onStompError: (frame) => {
+      console.error('STOMP 错误', frame)
+    }
+  })
+
+  stompClient.activate()
+}
+
+// 订阅评论更新
+const subscribeToComments = () => {
+  if (!stompClient || !stompClient.connected) {
+    return
+  }
+
+  const noteId = noteDetail.value?.noteId || props.noteId
+  if (!noteId) {
+    return
+  }
+
+  // 如果已经订阅，先取消订阅
+  if (commentSubscription) {
+    commentSubscription.unsubscribe()
+    commentSubscription = null
+  }
+
+  const destination = `/topic/note.${noteId}.comments`
+  commentSubscription = stompClient.subscribe(destination, (message) => {
+    try {
+      const newRemark = JSON.parse(message.body)
+      console.log('收到新评论:', newRemark)
+      
+      // 检查是否是当前笔记的评论
+      const currentNoteId = noteDetail.value?.noteId || props.noteId
+      if (newRemark.noteId !== currentNoteId) {
+        return
+      }
+
+      // 更新 LikedOrNot（根据当前用户）
+      const currentUserId = getCurrentUserId()
+      if (currentUserId) {
+        // 检查当前用户是否点赞了这条评论
+        // 这里简化处理，设为 false，实际应该从后端获取或检查
+        newRemark.LikedOrNot = false
+      }
+
+      // 如果是回复，需要找到父评论并添加到其 replies 中
+      if (newRemark.isReply && newRemark.parentId) {
+        // 递归查找父评论
+        const findAndAddReply = (commentList, parentId, reply) => {
+          for (const comment of commentList) {
+            if (comment._id === parentId) {
+              if (!comment.replies) {
+                comment.replies = []
+              }
+              // 检查是否已存在（避免重复）
+              const exists = comment.replies.some(r => r._id === reply._id)
+              if (!exists) {
+                comment.replies.push(reply)
+              }
+              return true
+            }
+            // 递归查找子评论
+            if (comment.replies && comment.replies.length > 0) {
+              if (findAndAddReply(comment.replies, parentId, reply)) {
+                return true
+              }
+            }
+          }
+          return false
+        }
+
+        // 尝试添加到现有评论的回复中
+        const added = findAndAddReply(comments.value, newRemark.parentId, newRemark)
+        
+        // 如果没找到父评论，说明父评论可能还没加载，重新获取评论列表
+        if (!added) {
+          fetchComments(currentNoteId)
+        }
+      } else {
+        // 一级评论，直接添加到列表
+        // 检查是否已存在（避免重复）
+        const exists = comments.value.some(c => c._id === newRemark._id)
+        if (!exists) {
+          comments.value.push(newRemark)
+          // 更新评论数统计
+          if (stats.value) {
+            stats.value.comments = (stats.value.comments || 0) + 1
+            emit('stats-updated', {
+              noteId: currentNoteId,
+              comments: stats.value.comments
+            })
+          }
+        }
+      }
+    } catch (err) {
+      console.error('解析 WebSocket 评论消息失败:', err)
+    }
+  })
+}
+
+// 断开 WebSocket 连接
+const disconnectWebSocket = () => {
+  if (commentSubscription) {
+    commentSubscription.unsubscribe()
+    commentSubscription = null
+  }
+  if (stompClient) {
+    stompClient.deactivate()
+    stompClient = null
+  }
+}
+
 onMounted(() => {
   if (props.noteId) {
     fetchNoteDetail()
   }
+  // 连接 WebSocket
+  connectWebSocket()
+})
+
+onUnmounted(() => {
+  // 组件卸载时断开 WebSocket
+  disconnectWebSocket()
 })
 </script>
 
