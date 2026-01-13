@@ -50,7 +50,7 @@
           回复
         </button>
         <button
-          v-if="isLoggedIn"
+          v-if="isLoggedIn && currentUserId && comment.userId === currentUserId"
           class="comment-action-btn danger"
           :disabled="commentActionLoading[comment._id]"
           @click="$emit('delete-comment', comment)"
@@ -95,6 +95,7 @@
         :comment="child"
         :depth="depth + 1"
         :is-logged-in="isLoggedIn"
+        :current-user-id="currentUserId"
         :replying-to-id="replyingToId"
         :reply-content="replyContent"
         :comment-submitting="commentSubmitting"
@@ -134,6 +135,10 @@ const props = defineProps({
   isLoggedIn: {
     type: Boolean,
     default: false
+  },
+  currentUserId: {
+    type: [Number, String],
+    default: null
   },
   replyingToId: {
     type: String,
