@@ -37,7 +37,7 @@
             <td>{{ remark.noteId || '-' }}</td>
             <td>{{ formatTime(remark.createdAt || remark.createTime) }}</td>
             <td>
-              <button class="action-btn" @click="viewNote(remark.noteId)">查看笔记</button>
+              <button class="action-btn view-note-btn" @click="viewNote(remark.noteId)">查看笔记</button>
               <button class="action-btn view-tree-btn" @click="viewCommentTree(remark)">查看评论树</button>
               <button class="action-btn delete-btn" @click="handleDeleteRemark(remark)">删除</button>
             </td>
@@ -419,7 +419,7 @@ onUnmounted(() => {
 .stat-value {
   font-size: 16px;
   font-weight: 600;
-  color: #007FFF;
+  color: var(--brand-primary);
 }
 
 .refresh-btn {
@@ -483,9 +483,9 @@ onUnmounted(() => {
 
 .action-btn {
   padding: 6px 12px;
-  border: 1px solid #007FFF;
+  border: 1px solid var(--brand-primary);
   background: white;
-  color: #007FFF;
+  color: var(--brand-primary);
   border-radius: 4px;
   cursor: pointer;
   font-size: 13px;
@@ -493,7 +493,7 @@ onUnmounted(() => {
 }
 
 .action-btn:hover {
-  background: #007FFF;
+  background: var(--brand-primary);
   color: white;
 }
 
@@ -505,6 +505,16 @@ onUnmounted(() => {
 
 .action-btn.delete-btn:hover {
   background: #dc3545;
+  color: white;
+}
+
+.action-btn.view-note-btn {
+  border-color: #007FFF;
+  color: #007FFF;
+}
+
+.action-btn.view-note-btn:hover {
+  background: #007FFF;
   color: white;
 }
 
@@ -644,19 +654,20 @@ onUnmounted(() => {
 
 .page-btn {
   padding: 8px 16px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--brand-primary);
   background: white;
-  color: #666;
+  color: var(--brand-primary);
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s;
+  outline: none;
 }
 
 .page-btn:hover:not(:disabled) {
-  background: #f5f5f5;
-  border-color: #007FFF;
-  color: #007FFF;
+  background: var(--surface-soft);
+  border-color: var(--brand-primary-hover);
+  color: var(--brand-primary-hover);
 }
 
 .page-btn:disabled {
@@ -673,9 +684,9 @@ onUnmounted(() => {
   min-width: 36px;
   height: 36px;
   padding: 0 8px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--brand-primary);
   background: white;
-  color: #666;
+  color: var(--brand-primary);
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
@@ -683,17 +694,18 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  outline: none;
 }
 
 .page-number:hover:not(.active):not(:disabled) {
-  background: #f5f5f5;
-  border-color: #007FFF;
-  color: #007FFF;
+  background: var(--surface-soft);
+  border-color: var(--brand-primary-hover);
+  color: var(--brand-primary-hover);
 }
 
 .page-number.active {
-  background: #007FFF;
-  border-color: #007FFF;
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
   color: white;
   font-weight: 600;
 }
