@@ -1937,8 +1937,10 @@ const isNoteUnderModeration = async (noteId) => {
 /* ================================================= */
 .editor-layout {
   display: flex;
-  height: 100vh;
-  width: 100vw;
+  /* 跟随外层居中内容区宽度，而不是占满整个视口宽度 */
+  width: 100%;
+  /* 占满可视区域高度（减去顶部固定导航的大致高度），避免上下留白 */
+  min-height: calc(100vh - 64px);
   background-color: #fff; /* 整体白色背景 */
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: #333;

@@ -22,12 +22,12 @@
           <div class="toast-content">
             <p class="toast-message" v-html="formattedMessage"></p>
             <p v-if="countdown > 0 && redirectTo" class="toast-countdown">{{ countdown }}秒后自动跳转...</p>
+            <div v-if="type === 'confirm'" class="toast-actions">
+              <button class="toast-btn toast-btn-cancel" @click="handleCancel">取消</button>
+              <button class="toast-btn toast-btn-confirm" @click="handleConfirm">确认</button>
+            </div>
           </div>
           <button v-if="showClose && type !== 'confirm'" class="toast-close" @click="handleClose">×</button>
-          <div v-if="type === 'confirm'" class="toast-actions">
-            <button class="toast-btn toast-btn-cancel" @click="handleCancel">取消</button>
-            <button class="toast-btn toast-btn-confirm" @click="handleConfirm">确认</button>
-          </div>
         </div>
       </div>
     </Transition>
@@ -307,6 +307,7 @@ onUnmounted(() => {
   gap: 12px;
   margin-top: 20px;
   justify-content: flex-end;
+  width: 100%;
 }
 
 .toast-btn {
@@ -338,9 +339,14 @@ onUnmounted(() => {
   background: var(--brand-primary-hover);
 }
 
-.toast-confirm .toast-content {
+.toast-confirm {
   flex-direction: column;
   align-items: flex-start;
+}
+
+.toast-confirm .toast-content {
+  width: 100%;
+  flex: 1;
 }
 
 @keyframes slideUp {
