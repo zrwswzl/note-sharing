@@ -200,11 +200,21 @@ public class QuestionService {
         QuestionDO q = repo.findByQuestionId(questionId);
         if (q == null) return;
 
+        // 确保likes列表不为null
+        if (q.getLikes() == null) {
+            q.setLikes(new ArrayList<>());
+        }
+
         boolean alreadyLiked = q.getLikes().contains(userId);
         if (alreadyLiked) {
             q.getLikes().remove(userId);
         } else {
             q.getLikes().add(userId);
+        }
+
+        // 确保点赞数不为负数
+        if (q.getLikes().size() < 0) {
+            q.setLikes(new ArrayList<>());
         }
 
         repo.save(q);
@@ -230,12 +240,22 @@ public class QuestionService {
 
         if (answer == null) return; // 如果没有找到该回答
 
+        // 确保likes列表不为null
+        if (answer.getLikes() == null) {
+            answer.setLikes(new ArrayList<>());
+        }
+
         // 判断用户是否已点赞
         boolean alreadyLiked = answer.getLikes().contains(userId);
         if (alreadyLiked) {
             answer.getLikes().remove(userId); // 如果已点赞，则移除
         } else {
             answer.getLikes().add(userId);    // 如果未点赞，则添加
+        }
+
+        // 确保点赞数不为负数
+        if (answer.getLikes().size() < 0) {
+            answer.setLikes(new ArrayList<>());
         }
 
         // 保存更新后的问题
@@ -269,12 +289,22 @@ public class QuestionService {
 
         if (comment == null) return; // 如果没有找到该评论
 
+        // 确保likes列表不为null
+        if (comment.getLikes() == null) {
+            comment.setLikes(new ArrayList<>());
+        }
+
         // 判断用户是否已点赞
         boolean alreadyLiked = comment.getLikes().contains(userId);
         if (alreadyLiked) {
             comment.getLikes().remove(userId); // 如果已点赞，则移除
         } else {
             comment.getLikes().add(userId);    // 如果未点赞，则添加
+        }
+
+        // 确保点赞数不为负数
+        if (comment.getLikes().size() < 0) {
+            comment.setLikes(new ArrayList<>());
         }
 
         // 保存更新后的问题
@@ -316,12 +346,22 @@ public class QuestionService {
 
         if (reply == null) return; // 如果没有找到该回复
 
+        // 确保likes列表不为null
+        if (reply.getLikes() == null) {
+            reply.setLikes(new ArrayList<>());
+        }
+
         // 判断用户是否已点赞
         boolean alreadyLiked = reply.getLikes().contains(userId);
         if (alreadyLiked) {
             reply.getLikes().remove(userId); // 如果已点赞，则移除
         } else {
             reply.getLikes().add(userId);    // 如果未点赞，则添加
+        }
+
+        // 确保点赞数不为负数
+        if (reply.getLikes().size() < 0) {
+            reply.setLikes(new ArrayList<>());
         }
 
         // 保存更新后的问题
@@ -340,11 +380,21 @@ public class QuestionService {
         QuestionDO q = repo.findByQuestionId(questionId);
         if (q == null) return;
 
+        // 确保favorites列表不为null
+        if (q.getFavorites() == null) {
+            q.setFavorites(new ArrayList<>());
+        }
+
         boolean alreadyFavorite = q.getFavorites().contains(userId);
         if (alreadyFavorite)
             q.getFavorites().remove(userId);
         else
             q.getFavorites().add(userId);
+
+        // 确保收藏数不为负数
+        if (q.getFavorites().size() < 0) {
+            q.setFavorites(new ArrayList<>());
+        }
 
         repo.save(q);
 

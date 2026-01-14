@@ -680,6 +680,11 @@ public class RemarkService {
             // Redis 已有点赞计数，直接自增
             newCount = redisTemplate.opsForValue().increment(countKey, 1L);
             redisTemplate.expire(countKey,Duration.ofMinutes(15));
+            // 确保不为负数
+            if (newCount == null || newCount < 0) {
+                redisTemplate.opsForValue().set(countKey, 0L);
+                newCount = 0L;
+            }
             log.info(newCount.toString());
 
         } else {
@@ -692,12 +697,22 @@ public class RemarkService {
                             .build()
                     );
 
+            // 确保数据库中的值不为负数
+            if (remarkCount.getRemarkLikeCount() < 0) {
+                remarkCount.setRemarkLikeCount(0L);
+            }
+
             // 同步到 Redis（作为 Hash）
-            redisTemplate.opsForValue().set(countKey,remarkCount.getRemarkLikeCount());
+            redisTemplate.opsForValue().set(countKey, remarkCount.getRemarkLikeCount());
             redisTemplate.expire(countKey,Duration.ofMinutes(15));
 
             // 自增一次
-            redisTemplate.opsForValue().increment(countKey, 1L);
+            newCount = redisTemplate.opsForValue().increment(countKey, 1L);
+            // 确保不为负数
+            if (newCount == null || newCount < 0) {
+                redisTemplate.opsForValue().set(countKey, 0L);
+                newCount = 0L;
+            }
         }
 
 
@@ -762,10 +777,12 @@ public class RemarkService {
         if (redisTemplate.hasKey(countKey)) {
 
             // Redis 已有计数，直接减 1（但不低于 0）
-            Long current = redisTemplate.opsForValue().increment(countKey,-1L);
-            redisTemplate.expire(countKey,Duration.ofMinutes(15));
-            if (current == null || current <0) {
+            Long current = redisTemplate.opsForValue().increment(countKey, -1L);
+            redisTemplate.expire(countKey, Duration.ofMinutes(15));
+            // 确保不为负数
+            if (current == null || current < 0) {
                 redisTemplate.opsForValue().set(countKey, 0L);
+                // 如果当前值已经是0或更小，说明数据不一致，返回false
                 return false;
             }
         } else {
@@ -775,14 +792,22 @@ public class RemarkService {
                 return false;
             }
 
+            // 确保数据库中的值不为负数
+            if (remarkCount.getRemarkLikeCount() < 0) {
+                remarkCount.setRemarkLikeCount(0L);
+            }
 
             // 同步到 Redis
             redisTemplate.opsForValue().set(countKey, remarkCount.getRemarkLikeCount());
-            redisTemplate.expire(redisKey,Duration.ofMinutes(15));
+            redisTemplate.expire(countKey, Duration.ofMinutes(15));
 
             // 自减一次（不低于 0）
             if (remarkCount.getRemarkLikeCount() > 0) {
-                redisTemplate.opsForValue().increment(countKey, -1);
+                Long newValue = redisTemplate.opsForValue().increment(countKey, -1);
+                // 确保不为负数
+                if (newValue == null || newValue < 0) {
+                    redisTemplate.opsForValue().set(countKey, 0L);
+                }
             }
         }
         return true;
