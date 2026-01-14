@@ -70,15 +70,22 @@ const login = async () => {
 
     console.log(res);
 
-    // 保存 token
+    // 保存 token 并解码用户信息
     if (res.token) {
       localStorage.setItem("token", res.token);
-      
+
       // 设置登录入口类型为管理员
       userStore.setLoginType('admin');
       // 解码并设置 token 中的用户信息
-      userStore.decodeAndSetToken(res.token, 'admin');
-      
+      const ok = userStore.decodeAndSetToken(res.token, 'admin');
+
+      // 额外校验：如果角色不是 Admin，则提示“您没有权限”，并清理登录状态
+      if (!ok || !userStore.isAdmin) {
+        userStore.clearUserData();
+        showMessage("您没有权限", "error");
+        return;
+      }
+
       // 显示成功消息并自动跳转
       showMessage("登录成功！", "success", "/admin/main");
     } else {
@@ -86,7 +93,17 @@ const login = async () => {
     }
 
   } catch (e) {
-    showMessage("登录失败：" + (e.response?.data?.message || e.message), "error");
+    // 如果后端返回的是权限错误，也统一提示“您没有权限”
+    const msg =
+      e.response?.data?.error ||
+      e.response?.data?.message ||
+      e.message ||
+      "";
+    if (e.response?.status === 403 || msg.includes("权限") || msg.toLowerCase().includes("forbidden")) {
+      showMessage("您没有权限", "error");
+    } else {
+      showMessage("登录失败：" + msg, "error");
+    }
   }
 };
 </script>
